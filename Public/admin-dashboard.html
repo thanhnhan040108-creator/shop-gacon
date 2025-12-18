@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <b>Admin Dashboard</b>
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <h3>Users</h3>
+  <div id="users"></div>
+
+  <h3>Topup Requests</h3>
+  <div id="topups"></div>
+</div>
+
+<script>
+const t = localStorage.getItem("adminToken");
+if(!t) location.href="/admin.html";
+const H = { headers:{ "Authorization":"Bearer "+t } };
+
+fetch("/api/admin/users", H).then(r=>r.json()).then(list=>{
+  users.innerHTML = list.map(u=>`
+    <div class="card">
+      ${u.username} | Balance: ${u.balance}
+    </div>
+  `).join("");
+});
+
+fetch("/api/admin/topups", H).then(r=>r.json()).then(list=>{
+  topups.innerHTML = list.map(t=>`
+    <div class="card">
+      ${t.username} - ${t.amount} - ${t.status}
+      ${t.status==="pending" ? `
+        <button onclick="approve(${t.id})">Approve</button>
+        <button onclick="reject(${t.id})">Reject</button>
+      `:""}
+    </div>
+  `).join("");
+});
+
+function approve(id){
+  fetch(`/api/admin/topups/${id}/approve`, {method:"POST", ...H})
+    .then(()=>location.reload());
+}
+function reject(id){
+  fetch(`/api/admin/topups/${id}/reject`, {method:"POST", ...H})
+    .then(()=>location.reload());
+}
+function logout(){
+  localStorage.removeItem("adminToken");
+  location.href="/admin.html";
+}
+</script>
+</body>
+</html>
