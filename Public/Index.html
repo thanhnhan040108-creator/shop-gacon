@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Shop - Đăng nhập</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="container">
+  <h2>User Login</h2>
+
+  <input id="u" placeholder="Username">
+  <input id="p" type="password" placeholder="Password">
+  <button onclick="login()">Đăng nhập</button>
+
+  <hr>
+
+  <h3>Đăng ký</h3>
+  <input id="ru" placeholder="Username">
+  <input id="re" placeholder="Email">
+  <input id="rp" type="password" placeholder="Password">
+  <button onclick="register()">Đăng ký</button>
+
+  <p class="small">
+    Admin? <a href="/admin.html">Vào trang admin</a>
+  </p>
+</div>
+
+<script>
+async function login() {
+  const res = await fetch("/api/auth/login", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      username: u.value,
+      password: p.value
+    })
+  });
+  const d = await res.json();
+  if(!res.ok) return alert(d.error);
+  localStorage.setItem("token", d.token);
+  location.href="/home.html";
+}
+
+async function register() {
+  const res = await fetch("/api/auth/register", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      username: ru.value,
+      email: re.value,
+      password: rp.value
+    })
+  });
+  const d = await res.json();
+  if(!res.ok) return alert(d.error);
+  alert("Đăng ký thành công");
+}
+</script>
+</body>
+</html>
