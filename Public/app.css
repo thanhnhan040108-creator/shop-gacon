@@ -1,3 +1,4 @@
+* { box-sizing: border-box; }
 body {
   font-family: Arial, sans-serif;
   background: #f5f6fa;
@@ -6,21 +7,22 @@ body {
 }
 
 .container {
-  max-width: 900px;
-  margin: 40px auto;
+  max-width: 1000px;
+  margin: 28px auto;
   background: #fff;
-  padding: 20px;
-  border-radius: 10px;
+  padding: 18px;
+  border-radius: 12px;
 }
 
-h2 {
-  margin-top: 0;
-}
+h2, h3 { margin: 10px 0; }
+hr { border: none; border-top: 1px solid #eee; margin: 16px 0; }
 
-input, button {
+input, button, select {
   padding: 10px;
   margin: 6px 0;
   width: 100%;
+  border-radius: 8px;
+  border: 1px solid #ddd;
 }
 
 button {
@@ -28,27 +30,74 @@ button {
   color: #fff;
   border: none;
   cursor: pointer;
-  border-radius: 6px;
+  font-weight: 600;
 }
 
-button:hover {
-  background: #c0392b;
-}
+button:hover { background: #c0392b; }
 
-.card {
-  border: 1px solid #ddd;
-  padding: 12px;
-  border-radius: 8px;
-  margin: 10px 0;
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .nav {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 15px;
+  align-items: center;
+  gap: 10px;
 }
 
-.small {
-  font-size: 13px;
-  color: #666;
+.nav b { font-size: 16px; }
+.nav .right { display:flex; gap: 8px; }
+
+.small { font-size: 13px; color: #666; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (max-width: 720px){
+  .row, .grid { grid-template-columns: 1fr; }
+}
+
+.card {
+  border: 1px solid #eee;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: #f0f0f0;
+  margin-left: 6px;
+}
+
+.btn-sm {
+  padding: 8px 10px;
+  width: auto;
+}
+
+.btn-green { background: #2ecc71; }
+.btn-green:hover { background: #27ae60; }
+
+.btn-gray { background: #7f8c8d; }
+.btn-gray:hover { background: #5f6b6c; }
+
+.btn-blue { background: #3498db; }
+.btn-blue:hover { background: #2c80b9; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th, .table td{
+  border-bottom: 1px solid #eee;
+  padding: 8px;
+  text-align: left;
+  font-size: 14px;
 }
