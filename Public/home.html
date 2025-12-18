@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Home</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <b>User Home</b>
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <p id="me"></p>
+
+  <h3>Dịch vụ</h3>
+  <div id="services"></div>
+
+  <h3>Nạp tiền</h3>
+  <input id="amount" placeholder="Số tiền">
+  <input id="note" placeholder="Ghi chú">
+  <button onclick="topup()">Tạo yêu cầu nạp</button>
+</div>
+
+<script>
+const token = localStorage.getItem("token");
+if(!token) location.href="/";
+
+function auth() {
+  return { headers:{ "Authorization":"Bearer "+token, "Content-Type":"application/json" }};
+}
+
+fetch("/api/me", auth()).then(r=>r.json()).then(d=>{
+  me.innerText = `Xin chào ${d.username} | Số dư: ${d.balance}`;
+});
+
+fetch("/api/services", auth()).then(r=>r.json()).then(list=>{
+  services.innerHTML = list.map(s=>`
+    <div class="card">
+      <b>${s.name}</b><br>
+      Giá: ${s.price}
+      <button onclick="buy(${s.id})">Mua</button>
+    </div>
+  `).join("");
+});
+
+function buy(id){
+  fetch("/api/orders", {
+    method:"POST",
+    ...auth(),
+    body: JSON.stringify({ serviceId:id })
+  }).then(r=>r.json()).then(d=>{
+    if(d.error) alert(d.error);
+    else alert("Mua thành công");
+  });
+}
+
+function topup(){
+  fetch("/api/topups", {
+    method:"POST",
+    ...auth(),
+    body: JSON.stringify({ amount:amount.value, note:note.value })
+  }).then(r=>r.json()).then(d=>{
+    if(d.error) alert(d.error);
+    else alert("Đã gửi yêu cầu nạp");
+  });
+}
+
+function logout(){
+  localStorage.removeItem("token");
+  location.href="/";
+}
+</script>
+</body>
+</html>
