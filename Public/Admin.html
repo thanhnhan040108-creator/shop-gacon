@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Admin Login</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="container">
+  <h2>Admin Login</h2>
+  <input id="a" placeholder="Admin user">
+  <input id="p" type="password" placeholder="Password">
+  <button onclick="login()">Đăng nhập</button>
+</div>
+
+<script>
+async function login(){
+  const res = await fetch("/api/admin/login", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ username:a.value, password:p.value })
+  });
+  const d = await res.json();
+  if(!res.ok) return alert(d.error);
+  localStorage.setItem("adminToken", d.token);
+  location.href="/admin-dashboard.html";
+}
+</script>
+</body>
+</html>
