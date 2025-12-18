@@ -2,25 +2,43 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <title>Home</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>User Home</title>
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
 <div class="container">
   <div class="nav">
-    <b>User Home</b>
-    <button onclick="logout()">Logout</button>
+    <b>USER HOME</b>
+    <div class="right">
+      <button class="btn-sm btn-gray" onclick="reloadAll()">Refresh</button>
+      <button class="btn-sm" onclick="logout()">Logout</button>
+    </div>
   </div>
 
-  <p id="me"></p>
+  <div class="card">
+    <div id="me"></div>
+    <div class="small">Sau khi mua dịch vụ sẽ trừ số dư và lưu lịch sử.</div>
+  </div>
 
   <h3>Dịch vụ</h3>
-  <div id="services"></div>
+  <div id="services" class="grid"></div>
 
   <h3>Nạp tiền</h3>
-  <input id="amount" placeholder="Số tiền">
-  <input id="note" placeholder="Ghi chú">
-  <button onclick="topup()">Tạo yêu cầu nạp</button>
+  <div class="card">
+    <input id="amount" placeholder="Số tiền (VD: 50000)">
+    <input id="note" placeholder="Ghi chú (tuỳ chọn)">
+    <button onclick="topup()">Tạo yêu cầu nạp</button>
+    <div class="small">Admin sẽ duyệt và cộng số dư sau.</div>
+  </div>
+
+  <h3>Lịch sử mua hàng</h3>
+  <div id="orders"></div>
+
+  <h3>Lịch sử nạp tiền</h3>
+  <div id="topupHistory"></div>
+
+  <p class="small" id="msg"></p>
 </div>
 
 <script>
@@ -28,49 +46,105 @@ const token = localStorage.getItem("token");
 if(!token) location.href="/";
 
 function auth() {
-  return { headers:{ "Authorization":"Bearer "+token, "Content-Type":"application/json" }};
+  return {
+    headers:{
+      "Authorization":"Bearer "+token,
+      "Content-Type":"application/json"
+    }
+  };
 }
 
-fetch("/api/me", auth()).then(r=>r.json()).then(d=>{
-  me.innerText = `Xin chào ${d.username} | Số dư: ${d.balance}`;
-});
+function money(n){
+  try { return Number(n).toLocaleString("vi-VN"); } catch { return n; }
+}
 
-fetch("/api/services", auth()).then(r=>r.json()).then(list=>{
-  services.innerHTML = list.map(s=>`
+async function loadMe(){
+  const r = await fetch("/api/me", auth());
+  const d = await r.json();
+  if(!r.ok) { localStorage.removeItem("token"); return location.href="/"; }
+  me.innerHTML = `<b>${d.username}</b> | Số dư: <b>${money(d.balance)}</b>`;
+}
+
+async function loadServices(){
+  const r = await fetch("/api/services", auth());
+  const list = await r.json();
+  services.innerHTML = (list || []).map(s=>`
     <div class="card">
       <b>${s.name}</b><br>
-      Giá: ${s.price}
-      <button onclick="buy(${s.id})">Mua</button>
+      Giá: <b>${money(s.price)}</b>
+      <div style="margin-top:8px">
+        <button class="btn-sm btn-blue" onclick="buy(${s.id})">Mua</button>
+      </div>
     </div>
-  `).join("");
-});
+  `).join("") || `<p class="small">Chưa có dịch vụ.</p>`;
+}
 
-function buy(id){
-  fetch("/api/orders", {
+async function loadOrders(){
+  const r = await fetch("/api/orders", auth());
+  const list = await r.json();
+  orders.innerHTML = (list && list.length) ? list.map(o=>`
+    <div class="card">
+      <b>${o.service_name}</b>
+      <span class="badge">${o.status}</span><br>
+      Giá: ${money(o.price)}<br>
+      <span class="small">${o.created_at}</span>
+    </div>
+  `).join("") : `<p class="small">Chưa có đơn nào.</p>`;
+}
+
+async function loadTopups(){
+  const r = await fetch("/api/topups", auth());
+  const list = await r.json();
+  topupHistory.innerHTML = (list && list.length) ? list.map(t=>`
+    <div class="card">
+      Số tiền: <b>${money(t.amount)}</b>
+      <span class="badge">${t.status}</span><br>
+      Ghi chú: ${t.note || ""}<br>
+      <span class="small">${t.created_at}</span>
+    </div>
+  `).join("") : `<p class="small">Chưa có yêu cầu nạp.</p>`;
+}
+
+async function buy(id){
+  msg.innerText = "";
+  const r = await fetch("/api/orders", {
     method:"POST",
     ...auth(),
     body: JSON.stringify({ serviceId:id })
-  }).then(r=>r.json()).then(d=>{
-    if(d.error) alert(d.error);
-    else alert("Mua thành công");
   });
+  const d = await r.json();
+  if(!r.ok) return msg.innerText = d.error || "Lỗi mua";
+  msg.innerText = "Mua thành công!";
+  await reloadAll();
 }
 
-function topup(){
-  fetch("/api/topups", {
+async function topup(){
+  msg.innerText = "";
+  const r = await fetch("/api/topups", {
     method:"POST",
     ...auth(),
-    body: JSON.stringify({ amount:amount.value, note:note.value })
-  }).then(r=>r.json()).then(d=>{
-    if(d.error) alert(d.error);
-    else alert("Đã gửi yêu cầu nạp");
+    body: JSON.stringify({ amount: amount.value, note: note.value })
   });
+  const d = await r.json();
+  if(!r.ok) return msg.innerText = d.error || "Lỗi nạp";
+  msg.innerText = "Đã gửi yêu cầu nạp, chờ admin duyệt.";
+  amount.value = ""; note.value = "";
+  await loadTopups();
+}
+
+async function reloadAll(){
+  await loadMe();
+  await loadServices();
+  await loadOrders();
+  await loadTopups();
 }
 
 function logout(){
   localStorage.removeItem("token");
   location.href="/";
 }
+
+reloadAll();
 </script>
 </body>
 </html>
