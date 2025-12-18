@@ -2,26 +2,37 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin Login</title>
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
 <div class="container">
-  <h2>Admin Login</h2>
+  <div class="nav">
+    <b>ADMIN</b>
+    <div class="right">
+      <a class="small" href="/">User</a>
+    </div>
+  </div>
+
+  <h2>Đăng nhập Admin</h2>
   <input id="a" placeholder="Admin user">
   <input id="p" type="password" placeholder="Password">
   <button onclick="login()">Đăng nhập</button>
+
+  <p class="small" id="msg"></p>
 </div>
 
 <script>
 async function login(){
+  msg.innerText = "";
   const res = await fetch("/api/admin/login", {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ username:a.value, password:p.value })
   });
   const d = await res.json();
-  if(!res.ok) return alert(d.error);
+  if(!res.ok) return msg.innerText = d.error || "Lỗi";
   localStorage.setItem("adminToken", d.token);
   location.href="/admin-dashboard.html";
 }
