@@ -2,60 +2,200 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Admin Dashboard</title>
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
 <div class="container">
   <div class="nav">
-    <b>Admin Dashboard</b>
-    <button onclick="logout()">Logout</button>
+    <b>ADMIN DASHBOARD</b>
+    <div class="right">
+      <button class="btn-sm btn-gray" onclick="reloadAll()">Refresh</button>
+      <button class="btn-sm" onclick="logout()">Logout</button>
+    </div>
   </div>
+
+  <h3>Quản lý dịch vụ</h3>
+  <div class="card">
+    <div class="row">
+      <input id="sName" placeholder="Tên dịch vụ">
+      <input id="sPrice" placeholder="Giá (VD: 99000)">
+    </div>
+    <select id="sActive">
+      <option value="1">Active</option>
+      <option value="0">Inactive</option>
+    </select>
+    <button class="btn-sm btn-blue" onclick="addService()">Thêm dịch vụ</button>
+    <div class="small">Bạn có thể sửa nhanh ở danh sách bên dưới.</div>
+  </div>
+
+  <div id="services"></div>
 
   <h3>Users</h3>
   <div id="users"></div>
 
-  <h3>Topup Requests</h3>
+  <h3>Yêu cầu nạp (Topup)</h3>
   <div id="topups"></div>
+
+  <h3>Orders</h3>
+  <div id="orders"></div>
+
+  <p class="small" id="msg"></p>
 </div>
 
 <script>
 const t = localStorage.getItem("adminToken");
 if(!t) location.href="/admin.html";
-const H = { headers:{ "Authorization":"Bearer "+t } };
 
-fetch("/api/admin/users", H).then(r=>r.json()).then(list=>{
-  users.innerHTML = list.map(u=>`
-    <div class="card">
-      ${u.username} | Balance: ${u.balance}
-    </div>
-  `).join("");
-});
+const H = {
+  headers:{
+    "Authorization":"Bearer "+t,
+    "Content-Type":"application/json"
+  }
+};
 
-fetch("/api/admin/topups", H).then(r=>r.json()).then(list=>{
-  topups.innerHTML = list.map(t=>`
-    <div class="card">
-      ${t.username} - ${t.amount} - ${t.status}
-      ${t.status==="pending" ? `
-        <button onclick="approve(${t.id})">Approve</button>
-        <button onclick="reject(${t.id})">Reject</button>
-      `:""}
-    </div>
-  `).join("");
-});
-
-function approve(id){
-  fetch(`/api/admin/topups/${id}/approve`, {method:"POST", ...H})
-    .then(()=>location.reload());
+function money(n){
+  try { return Number(n).toLocaleString("vi-VN"); } catch { return n; }
 }
-function reject(id){
-  fetch(`/api/admin/topups/${id}/reject`, {method:"POST", ...H})
-    .then(()=>location.reload());
+
+async function loadServices(){
+  const r = await fetch("/api/admin/services", H);
+  const list = await r.json();
+  services.innerHTML = (list && list.length) ? list.map(s=>`
+    <div class="card">
+      <div class="row">
+        <input id="n${s.id}" value="${escapeHtml(s.name)}">
+        <input id="p${s.id}" value="${s.price}">
+      </div>
+      <div class="row">
+        <select id="a${s.id}">
+          <option value="1" ${s.active ? "selected":""}>Active</option>
+          <option value="0" ${!s.active ? "selected":""}>Inactive</option>
+        </select>
+        <button class="btn-sm btn-green" onclick="updateService(${s.id})">Update</button>
+      </div>
+      <div class="small">#${s.id} | ${s.created_at}</div>
+    </div>
+  `).join("") : `<p class="small">Chưa có dịch vụ.</p>`;
 }
+
+async function addService(){
+  msg.innerText = "";
+  const r = await fetch("/api/admin/services", {
+    method:"POST",
+    ...H,
+    body: JSON.stringify({
+      name: sName.value,
+      price: Number(sPrice.value),
+      active: sActive.value === "1"
+    })
+  });
+  const d = await r.json();
+  if(!r.ok) return msg.innerText = d.error || "Lỗi thêm dịch vụ";
+  sName.value=""; sPrice.value="";
+  msg.innerText = "Đã thêm dịch vụ.";
+  await loadServices();
+}
+
+async function updateService(id){
+  msg.innerText = "";
+  const r = await fetch("/api/admin/services/"+id, {
+    method:"PUT",
+    ...H,
+    body: JSON.stringify({
+      name: document.getElementById("n"+id).value,
+      price: Number(document.getElementById("p"+id).value),
+      active: document.getElementById("a"+id).value === "1"
+    })
+  });
+  const d = await r.json();
+  if(!r.ok) return msg.innerText = d.error || "Lỗi update";
+  msg.innerText = "Đã cập nhật dịch vụ.";
+  await loadServices();
+}
+
+async function loadUsers(){
+  const r = await fetch("/api/admin/users", H);
+  const list = await r.json();
+  users.innerHTML = (list && list.length) ? `
+    <table class="table">
+      <thead><tr><th>User</th><th>Email</th><th>Balance</th><th>Created</th></tr></thead>
+      <tbody>
+        ${list.map(u=>`
+          <tr>
+            <td>${escapeHtml(u.username)}</td>
+            <td>${escapeHtml(u.email)}</td>
+            <td>${money(u.balance)}</td>
+            <td>${u.created_at}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  ` : `<p class="small">Chưa có user.</p>`;
+}
+
+async function loadTopups(){
+  const r = await fetch("/api/admin/topups", H);
+  const list = await r.json();
+  topups.innerHTML = (list && list.length) ? list.map(tu=>`
+    <div class="card">
+      <b>${escapeHtml(tu.username)}</b> - <b>${money(tu.amount)}</b>
+      <span class="badge">${tu.status}</span><br>
+      Note: ${escapeHtml(tu.note || "")}<br>
+      <span class="small">${tu.created_at}</span><br>
+      ${tu.status==="pending" ? `
+        <button class="btn-sm btn-green" onclick="approve(${tu.id})">Approve</button>
+        <button class="btn-sm btn-gray" onclick="reject(${tu.id})">Reject</button>
+      ` : ""}
+    </div>
+  `).join("") : `<p class="small">Chưa có topup.</p>`;
+}
+
+async function approve(id){
+  await fetch(`/api/admin/topups/${id}/approve`, { method:"POST", headers: H.headers });
+  await reloadAll();
+}
+async function reject(id){
+  await fetch(`/api/admin/topups/${id}/reject`, { method:"POST", headers: H.headers });
+  await reloadAll();
+}
+
+async function loadOrders(){
+  const r = await fetch("/api/admin/orders", H);
+  const list = await r.json();
+  orders.innerHTML = (list && list.length) ? list.map(o=>`
+    <div class="card">
+      <b>${escapeHtml(o.username)}</b> mua <b>${escapeHtml(o.service_name)}</b>
+      <span class="badge">${o.status}</span><br>
+      Giá: ${money(o.price)}<br>
+      <span class="small">${o.created_at}</span>
+    </div>
+  `).join("") : `<p class="small">Chưa có order.</p>`;
+}
+
 function logout(){
   localStorage.removeItem("adminToken");
   location.href="/admin.html";
 }
+
+async function reloadAll(){
+  await loadServices();
+  await loadUsers();
+  await loadTopups();
+  await loadOrders();
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+reloadAll();
 </script>
 </body>
 </html>
