@@ -2,13 +2,20 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <title>Shop - Đăng nhập</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shop - User Login</title>
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
 <div class="container">
-  <h2>User Login</h2>
+  <div class="nav">
+    <b>SHOP - USER</b>
+    <div class="right">
+      <a class="small" href="/admin.html">Admin</a>
+    </div>
+  </div>
 
+  <h2>Đăng nhập</h2>
   <input id="u" placeholder="Username">
   <input id="p" type="password" placeholder="Password">
   <button onclick="login()">Đăng nhập</button>
@@ -16,45 +23,40 @@
   <hr>
 
   <h3>Đăng ký</h3>
-  <input id="ru" placeholder="Username">
-  <input id="re" placeholder="Email">
-  <input id="rp" type="password" placeholder="Password">
+  <div class="row">
+    <input id="ru" placeholder="Username">
+    <input id="re" placeholder="Email">
+  </div>
+  <input id="rp" type="password" placeholder="Password (>=6 ký tự)">
   <button onclick="register()">Đăng ký</button>
 
-  <p class="small">
-    Admin? <a href="/admin.html">Vào trang admin</a>
-  </p>
+  <p class="small" id="msg"></p>
 </div>
 
 <script>
 async function login() {
+  msg.innerText = "";
   const res = await fetch("/api/auth/login", {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      username: u.value,
-      password: p.value
-    })
+    body: JSON.stringify({ username: u.value, password: p.value })
   });
   const d = await res.json();
-  if(!res.ok) return alert(d.error);
+  if(!res.ok) return msg.innerText = d.error || "Lỗi";
   localStorage.setItem("token", d.token);
   location.href="/home.html";
 }
 
 async function register() {
+  msg.innerText = "";
   const res = await fetch("/api/auth/register", {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      username: ru.value,
-      email: re.value,
-      password: rp.value
-    })
+    body: JSON.stringify({ username: ru.value, email: re.value, password: rp.value })
   });
   const d = await res.json();
-  if(!res.ok) return alert(d.error);
-  alert("Đăng ký thành công");
+  if(!res.ok) return msg.innerText = d.error || "Lỗi";
+  msg.innerText = "Đăng ký thành công! Bạn có thể đăng nhập.";
 }
 </script>
 </body>
