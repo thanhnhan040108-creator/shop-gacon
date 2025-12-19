@@ -3,289 +3,233 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin Dashboard - Shop Gà Con</title>
-  <link rel="stylesheet" href="app.css" />
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="/app.css" />
 </head>
-<body class="page">
+<body>
   <div class="container">
-    <div class="topbar">
-      <div>
-        <b>Admin Dashboard</b>
-        <div id="who" class="muted" style="font-size:12px">...</div>
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <h1>ADMIN DASHBOARD</h1>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <a class="btn" href="home.html">Home</a>
-        <button class="btn" id="btnLogout">Đăng xuất</button>
+      <div class="right">
+        <button class="btn-secondary" id="btnRefresh">Refresh</button>
+        <button class="btn-secondary" id="btnAdminLogout">Đăng xuất</button>
       </div>
     </div>
 
-    <div class="row" style="margin-top:14px">
-      <div class="col">
-        <div class="card">
-          <h2>Thêm dịch vụ</h2>
-          <div class="muted" style="font-size:12px">
-            (Bạn đã có sẵn dịch vụ trong Data.json rồi. Form này để thêm/sửa sau.)
-          </div>
-          <div class="hr"></div>
-
-          <div class="field">
-            <label>Category</label>
-            <input id="svcCat" placeholder="Ví dụ: Bounty Hunt 💸" />
-          </div>
-          <div class="field">
-            <label>Title</label>
-            <input id="svcTitle" placeholder="Ví dụ: 1m Bounty hải tặc" />
-          </div>
-          <div class="field">
-            <label>Desc</label>
-            <input id="svcDesc" placeholder="Mô tả thêm" />
-          </div>
-          <div class="field">
-            <label>Price (VND) (0 = IB báo giá)</label>
-            <input id="svcPrice" type="number" placeholder="10000" />
-          </div>
-          <button class="btn primary" id="btnAddSvc">Thêm</button>
-          <div id="svcMsg" class="muted" style="margin-top:10px"></div>
+    <div class="grid">
+      <div class="card">
+        <h2>Topup PENDING</h2>
+        <div class="muted">Kiểm tra ngân hàng xong bấm duyệt (cộng tiền).</div>
+        <div id="pendingTopups" class="list"></div>
+      
+      <div class="card">
+        <h2>Hỗ trợ & Liên hệ</h2>
+        <div class="muted">Gửi link/ảnh giao dịch, mã nạp hoặc thông tin đơn để xử lý nhanh.</div>
+        <div class="hr"></div>
+        <div class="support-box">
+          <a class="btn-secondary" href="https://www.facebook.com/share/1ajgzqUGdh/" target="_blank" rel="noopener">Mở Facebook (Message)</a>
+          <button class="btn-secondary" id="btnCopySupport" type="button">Copy mẫu tin nhắn</button>
         </div>
-
-        <div class="card" style="margin-top:14px">
-          <h2>Danh sách dịch vụ</h2>
-          <button class="btn" id="btnReloadSvc">Tải lại</button>
-          <div id="svcList" style="margin-top:10px"></div>
-        </div>
+        <div class="note" id="supportNote" style="display:none"></div>
       </div>
 
-      <div class="col">
+</div>
+
+      <div>
         <div class="card">
-          <h2>Đơn hàng</h2>
-          <div class="muted" style="font-size:12px">Đổi trạng thái + ghi chú admin.</div>
+          <h2>Users</h2>
+          <div class="muted">Set balance hoặc xoá user.</div>
+          <div id="users" class="list"></div>
+
           <div class="hr"></div>
-          <button class="btn" id="btnReloadOrders">Tải lại</button>
-          <div id="orderList" style="margin-top:10px"></div>
+          <h2>Thao tác nhanh</h2>
+          <div class="row">
+            <input id="opUser" placeholder="username" />
+            <input id="opBal" type="number" placeholder="balance mới (VND)" />
+            <button id="btnSetBal">Set Balance</button>
+            <button id="btnDelUser" class="btn-danger">Xoá User</button>
+          </div>
+          <div id="msg" class="note" style="display:none"></div>
         </div>
 
-        <div class="card" style="margin-top:14px">
-          <h2>Yêu cầu nạp</h2>
-          <div class="muted" style="font-size:12px">Duyệt sẽ cộng tiền vào số dư user.</div>
-          <div class="hr"></div>
-          <button class="btn" id="btnReloadTopups">Tải lại</button>
-          <div id="topList" style="margin-top:10px"></div>
-        </div>
-
-        <div class="card" style="margin-top:14px">
-          <h2>User</h2>
-          <button class="btn" id="btnReloadUsers">Tải lại</button>
-          <div id="userList" style="margin-top:10px"></div>
+        <div class="card section-title">
+          <h2>Orders (đổi trạng thái)</h2>
+          <div class="muted">PAID → DOING → DONE</div>
+          <div id="orders" class="list"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <script>
-    function token(){ return localStorage.getItem("token") || ""; }
-    async function api(path, method="GET", body=null){
-      const headers = {};
-      if (token()) headers["Authorization"] = "Bearer " + token();
-      if (body) headers["Content-Type"] = "application/json";
-      const res = await fetch(path, { method, headers, body: body?JSON.stringify(body):null });
-      return res.json();
-    }
-    function money(v){ return (Number(v||0)).toLocaleString("vi-VN") + "đ"; }
-    function esc(s){
-      return String(s||"")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;");
-    }
+<script>
+const adminUser = localStorage.getItem("adminUser");
+const adminPass = localStorage.getItem("adminPass");
+if(!adminUser || !adminPass) location.href = "/admin.html";
 
-    (async () => {
-      if(!token()) return location.href="admin.html";
-      const me = await api("/api/me");
-      if(!me.ok) return location.href="admin.html";
-      if(me.user.role !== "admin") return location.href="home.html";
-      document.getElementById("who").textContent = `Admin: ${me.user.username}`;
+function badge(status){ return `<span class="badge ${status}">${status}</span>`; }
+function money(n){ return Number(n).toLocaleString("vi-VN"); }
+function showMsg(t){ msg.style.display="block"; msg.innerText=t; }
 
-      loadServices();
-      loadOrders();
-      loadTopups();
-      loadUsers();
-    })();
+btnAdminLogout.onclick = () => {
+  localStorage.removeItem("adminUser");
+  localStorage.removeItem("adminPass");
+  location.href = "/admin.html";
+};
+btnRefresh.onclick = () => loadSummary();
 
-    document.getElementById("btnLogout").onclick = () => {
-      localStorage.removeItem("token");
-      localStorage.removeItem("me");
-      location.href = "admin.html";
+btnCopySupport.onclick = async () => {
+  const template = "Mình cần hỗ trợ đơn/nạp tiền\n- Username: ...\n- Mã nạp (NAP_...): ...\n- Số tiền: ...\n- Ảnh giao dịch: (đính kèm)\n- Ghi chú thêm: ...";
+  try{
+    await navigator.clipboard.writeText(template);
+    supportNote.style.display = "block";
+    supportNote.innerText = "Đã copy mẫu tin nhắn. Bạn dán vào Messenger để gửi.";
+  }catch(e){
+    supportNote.style.display = "block";
+    supportNote.innerText = template;
+  }
+};
+
+async function api(path, body){
+  const r = await fetch(path, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ adminUser, adminPass, ...body })
+  });
+  return r.json();
+}
+
+async function loadSummary(){
+  const r = await api("/api/admin/summary", {});
+  if(!r.ok){ alert("Sai admin"); return location.href="/admin.html"; }
+
+  renderTopups(r.topups || []);
+  renderUsers(r.users || []);
+  renderOrders(r.orders || []);
+}
+
+function renderTopups(items){
+  const pend = items.filter(t => t.status === "PENDING");
+  if(!pend.length){
+    pendingTopups.innerHTML = `<div class="muted">Không có topup chờ duyệt.</div>`;
+    return;
+  }
+  pendingTopups.innerHTML = pend.map(t => `
+    <div class="item">
+      <div>
+        <b>${t.username}</b> • <b>${money(t.amount)}đ</b> ${badge(t.status)}
+        <div class="muted">Nội dung: <span class="code">${t.code}</span></div>
+        <div class="muted">${new Date(t.createdAt).toLocaleString()}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button data-approve="${t.id}">Duyệt</button>
+        <button class="btn-secondary" data-reject="${t.id}">Từ chối</button>
+      </div>
+    </div>
+  `).join("");
+
+  pendingTopups.querySelectorAll("button[data-approve]").forEach(btn=>{
+    btn.onclick = async () => {
+      const id = btn.getAttribute("data-approve");
+      const d = await api("/api/admin/topups/approve", { topupId: id });
+      if(!d.ok) return alert(d.msg || "Duyệt thất bại");
+      await loadSummary();
     };
+  });
 
-    // ===== Services =====
-    async function loadServices(){
-      const box = document.getElementById("svcList");
-      box.innerHTML = "Đang tải...";
-      const data = await api("/api/services");
-      if(!data.ok){ box.innerHTML="Lỗi"; return; }
-
-      if(!data.services.length){ box.innerHTML="<div class='muted'>Chưa có dịch vụ.</div>"; return; }
-
-      let html = `<table class="table"><thead>
-        <tr><th>ID</th><th>Category</th><th>Title</th><th>Price</th><th>Action</th></tr>
-      </thead><tbody>`;
-      for(const s of data.services){
-        html += `<tr>
-          <td>${esc(s.id)}</td>
-          <td class="muted" style="font-size:12px">${esc(s.category)}</td>
-          <td><b>${esc(s.title)}</b><div class="muted" style="font-size:12px">${esc(s.desc||"")}</div></td>
-          <td>${Number(s.price)<=0 ? "IB" : money(s.price)}</td>
-          <td>
-            <button class="btn" onclick="editSvc('${esc(s.id)}')">Sửa</button>
-            <button class="btn" onclick="delSvc('${esc(s.id)}')">Xoá</button>
-          </td>
-        </tr>`;
-      }
-      html += `</tbody></table>`;
-      box.innerHTML = html;
-    }
-
-    document.getElementById("btnAddSvc").onclick = async () => {
-      const category = document.getElementById("svcCat").value.trim();
-      const title = document.getElementById("svcTitle").value.trim();
-      const desc = document.getElementById("svcDesc").value.trim();
-      const price = Number(document.getElementById("svcPrice").value || 0);
-      const msg = document.getElementById("svcMsg");
-      msg.textContent = "Đang thêm...";
-
-      const data = await api("/api/admin/services","POST",{category,title,desc,price});
-      if(!data.ok){ msg.textContent = "Lỗi: " + data.error; return; }
-      msg.textContent = "Đã thêm!";
-      loadServices();
+  pendingTopups.querySelectorAll("button[data-reject]").forEach(btn=>{
+    btn.onclick = async () => {
+      const id = btn.getAttribute("data-reject");
+      const d = await api("/api/admin/topups/reject", { topupId: id });
+      if(!d.ok) return alert(d.msg || "Từ chối thất bại");
+      await loadSummary();
     };
+  });
+}
 
-    document.getElementById("btnReloadSvc").onclick = () => loadServices();
+function renderUsers(items){
+  if(!items.length){
+    users.innerHTML = `<div class="muted">Chưa có user.</div>`;
+    return;
+  }
+  users.innerHTML = items.map(u => `
+    <div class="item">
+      <div>
+        <b>${u.username}</b>
+        <div class="muted">${u.gmail || ""}</div>
+        <div class="muted">Created: ${u.createdAt || ""}</div>
+      </div>
+      <div class="pill">Balance: <b>${money(u.balance || 0)}đ</b></div>
+    </div>
+  `).join("");
+}
 
-    window.delSvc = async (id) => {
-      if(!confirm("Xoá dịch vụ này?")) return;
-      const data = await api("/api/admin/services/"+id,"DELETE");
-      if(!data.ok) alert("Lỗi: "+data.error);
-      loadServices();
+function renderOrders(items){
+  if(!items.length){
+    orders.innerHTML = `<div class="muted">Chưa có order.</div>`;
+    return;
+  }
+
+  orders.innerHTML = items.slice(0, 80).map(o => `
+    <div class="item">
+      <div style="flex:1">
+        <div><b>${o.username}</b> • ${badge(o.status)}</div>
+        <div><b>${o.serviceName}</b> <span class="muted">(${o.category || ""})</span></div>
+        ${o.note ? `<div class="muted">📝 ${o.note}</div>` : ``}
+        <div class="muted">${money(o.amount)}đ • ${new Date(o.createdAt).toLocaleString()}</div>
+        ${o.updatedAt ? `<div class="muted">Update: ${new Date(o.updatedAt).toLocaleString()}</div>` : ``}
+      </div>
+
+      <div style="min-width:170px">
+        <div class="muted" style="margin-bottom:6px">Đổi status</div>
+        <select data-id="${o.id}" class="status-select">
+          <option value="PAID" ${o.status==="PAID"?"selected":""}>PAID</option>
+          <option value="DOING" ${o.status==="DOING"?"selected":""}>DOING</option>
+          <option value="DONE" ${o.status==="DONE"?"selected":""}>DONE</option>
+        </select>
+      </div>
+    </div>
+  `).join("");
+
+  orders.querySelectorAll("select.status-select").forEach(sel => {
+    sel.onchange = async () => {
+      const orderId = sel.getAttribute("data-id");
+      const status = sel.value;
+
+      const d = await api("/api/admin/orders/set-status", { orderId, status });
+      if(!d.ok) return alert(d.msg || "Lỗi đổi trạng thái");
     };
+  });
+}
 
-    window.editSvc = async (id) => {
-      const category = prompt("Category mới (bỏ trống giữ nguyên):");
-      const title = prompt("Title mới (bỏ trống giữ nguyên):");
-      const desc = prompt("Desc mới (bỏ trống giữ nguyên):");
-      const priceStr = prompt("Price mới (bỏ trống giữ nguyên, 0 = IB):");
-      const body = {};
-      if(category) body.category = category;
-      if(title) body.title = title;
-      if(desc) body.desc = desc;
-      if(priceStr !== null && priceStr !== "") body.price = Number(priceStr);
+btnSetBal.onclick = async () => {
+  const u = opUser.value.trim();
+  const b = Number(opBal.value);
+  if(!u) return showMsg("Thiếu username");
+  if(!Number.isFinite(b) || b < 0) return showMsg("Balance không hợp lệ");
 
-      const data = await api("/api/admin/services/"+id,"PUT",body);
-      if(!data.ok) alert("Lỗi: "+data.error);
-      loadServices();
-    };
+  const d = await api("/api/admin/set-balance", { username: u, balance: b });
+  if(!d.ok) return showMsg(d.msg || "Set balance lỗi");
+  showMsg("Đã set balance");
+  await loadSummary();
+};
 
-    // ===== Orders =====
-    async function loadOrders(){
-      const box = document.getElementById("orderList");
-      box.innerHTML = "Đang tải...";
-      const data = await api("/api/admin/orders");
-      if(!data.ok){ box.innerHTML="Lỗi"; return; }
-      if(!data.orders.length){ box.innerHTML="<div class='muted'>Chưa có đơn.</div>"; return; }
+btnDelUser.onclick = async () => {
+  const u = opUser.value.trim();
+  if(!u) return showMsg("Thiếu username");
 
-      let html = `<table class="table"><thead>
-        <tr><th>Mã</th><th>User</th><th>Dịch vụ</th><th>Giá</th><th>Trạng thái</th><th>Admin note</th><th>Action</th></tr>
-      </thead><tbody>`;
-      for(const o of data.orders){
-        html += `<tr>
-          <td>${esc(o.id)}</td>
-          <td><b>${esc(o.username)}</b></td>
-          <td><b>${esc(o.serviceTitle)}</b><div class="muted" style="font-size:12px">${esc(o.note||"")}</div></td>
-          <td>${money(o.price)}</td>
-          <td><span class="badge">${esc(o.status)}</span></td>
-          <td class="muted" style="font-size:12px">${esc(o.adminNote||"")}</td>
-          <td><button class="btn" onclick="updateOrder('${esc(o.id)}')">Cập nhật</button></td>
-        </tr>`;
-      }
-      html += `</tbody></table>`;
-      box.innerHTML = html;
-    }
-    document.getElementById("btnReloadOrders").onclick = () => loadOrders();
+  const ok = confirm("Xoá user sẽ xoá cả lịch sử mua/nạp. Bạn chắc chưa?");
+  if(!ok) return;
 
-    window.updateOrder = async (id) => {
-      const status = prompt("Nhập trạng thái (VD: Chờ xác nhận / Đang làm / Hoàn thành / Huỷ):");
-      const adminNote = prompt("Ghi chú admin:");
-      const data = await api("/api/admin/orders/"+id,"PUT",{status,adminNote});
-      if(!data.ok) alert("Lỗi: "+data.error);
-      loadOrders();
-    };
+  const d = await api("/api/admin/delete-user", { username: u });
+  if(!d.ok) return showMsg(d.msg || "Xoá lỗi");
+  showMsg("Đã xoá user. Removed=" + d.removed);
+  await loadSummary();
+};
 
-    // ===== Topups =====
-    async function loadTopups(){
-      const box = document.getElementById("topList");
-      box.innerHTML = "Đang tải...";
-      const data = await api("/api/admin/topups");
-      if(!data.ok){ box.innerHTML="Lỗi"; return; }
-      if(!data.topups.length){ box.innerHTML="<div class='muted'>Chưa có yêu cầu nạp.</div>"; return; }
-
-      let html = `<table class="table"><thead>
-        <tr><th>Mã</th><th>User</th><th>Số tiền</th><th>Trạng thái</th><th>Nội dung CK</th><th>Admin</th><th>Action</th></tr>
-      </thead><tbody>`;
-      for(const t of data.topups){
-        html += `<tr>
-          <td>${esc(t.id)}</td>
-          <td><b>${esc(t.username)}</b></td>
-          <td>${money(t.amount)}</td>
-          <td><span class="badge">${esc(t.status)}</span></td>
-          <td class="muted" style="font-size:12px">${esc(t.transferNote||"")}</td>
-          <td class="muted" style="font-size:12px">${esc(t.adminNote||"")}</td>
-          <td><button class="btn" onclick="updateTopup('${esc(t.id)}')">Cập nhật</button></td>
-        </tr>`;
-      }
-      html += `</tbody></table>`;
-      box.innerHTML = html;
-    }
-    document.getElementById("btnReloadTopups").onclick = () => loadTopups();
-
-    window.updateTopup = async (id) => {
-      const status = prompt("Nhập trạng thái (Chờ duyệt / Đã duyệt / Từ chối):");
-      const adminNote = prompt("Ghi chú admin:");
-      const data = await api("/api/admin/topups/"+id,"PUT",{status,adminNote});
-      if(!data.ok) alert("Lỗi: "+data.error);
-      loadTopups();
-      loadUsers();
-    };
-
-    // ===== Users =====
-    async function loadUsers(){
-      const box = document.getElementById("userList");
-      box.innerHTML = "Đang tải...";
-      const data = await api("/api/admin/users");
-      if(!data.ok){ box.innerHTML="Lỗi"; return; }
-
-      let html = `<table class="table"><thead>
-        <tr><th>ID</th><th>User</th><th>Role</th><th>Balance</th><th>Action</th></tr>
-      </thead><tbody>`;
-      for(const u of data.users){
-        html += `<tr>
-          <td>${esc(u.id)}</td>
-          <td><b>${esc(u.username)}</b></td>
-          <td>${esc(u.role)}</td>
-          <td>${money(u.balance)}</td>
-          <td>${u.role==="admin" ? "<span class='muted'>-</span>" : `<button class="btn" onclick="delUser('${esc(u.id)}')">Xoá</button>`}</td>
-        </tr>`;
-      }
-      html += `</tbody></table>`;
-      box.innerHTML = html;
-    }
-    document.getElementById("btnReloadUsers").onclick = () => loadUsers();
-
-    window.delUser = async (id) => {
-      if(!confirm("Xoá user này? (Sẽ xoá luôn đơn + topup của user)")) return;
-      const data = await api("/api/admin/users/"+id,"DELETE");
-      if(!data.ok) alert("Lỗi: "+data.error);
-      loadUsers(); loadOrders(); loadTopups();
-    };
-  </script>
+loadSummary();
+</script>
 </body>
 </html>
