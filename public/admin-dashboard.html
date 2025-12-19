@@ -29,7 +29,7 @@
       <div>
         <div class="card">
           <h2>Users</h2>
-          <div class="muted">Có thể set balance hoặc xoá user.</div>
+          <div class="muted">Set balance hoặc xoá user.</div>
           <div id="users" class="list"></div>
 
           <div class="hr"></div>
@@ -44,7 +44,8 @@
         </div>
 
         <div class="card section-title">
-          <h2>Orders</h2>
+          <h2>Orders (đổi trạng thái)</h2>
+          <div class="muted">PAID → DOING → DONE</div>
           <div id="orders" class="list"></div>
         </div>
       </div>
@@ -146,16 +147,37 @@ function renderOrders(items){
     orders.innerHTML = `<div class="muted">Chưa có order.</div>`;
     return;
   }
-  orders.innerHTML = items.slice(0, 50).map(o => `
+
+  orders.innerHTML = items.slice(0, 80).map(o => `
     <div class="item">
-      <div>
-        <b>${o.username}</b> • ${badge(o.status)}
-        <div><b>${o.serviceName}</b> <span class="muted">(${o.category})</span></div>
-        ${o.note ? `<div class="muted">${o.note}</div>` : ``}
+      <div style="flex:1">
+        <div><b>${o.username}</b> • ${badge(o.status)}</div>
+        <div><b>${o.serviceName}</b> <span class="muted">(${o.category || ""})</span></div>
+        ${o.note ? `<div class="muted">📝 ${o.note}</div>` : ``}
         <div class="muted">${money(o.amount)}đ • ${new Date(o.createdAt).toLocaleString()}</div>
+        ${o.updatedAt ? `<div class="muted">Update: ${new Date(o.updatedAt).toLocaleString()}</div>` : ``}
+      </div>
+
+      <div style="min-width:170px">
+        <div class="muted" style="margin-bottom:6px">Đổi status</div>
+        <select data-id="${o.id}" class="status-select">
+          <option value="PAID" ${o.status==="PAID"?"selected":""}>PAID</option>
+          <option value="DOING" ${o.status==="DOING"?"selected":""}>DOING</option>
+          <option value="DONE" ${o.status==="DONE"?"selected":""}>DONE</option>
+        </select>
       </div>
     </div>
   `).join("");
+
+  orders.querySelectorAll("select.status-select").forEach(sel => {
+    sel.onchange = async () => {
+      const orderId = sel.getAttribute("data-id");
+      const status = sel.value;
+
+      const d = await api("/api/admin/orders/set-status", { orderId, status });
+      if(!d.ok) return alert(d.msg || "Lỗi đổi trạng thái");
+    };
+  });
 }
 
 btnSetBal.onclick = async () => {
