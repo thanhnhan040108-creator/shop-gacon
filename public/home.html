@@ -23,7 +23,7 @@
     <div class="grid">
       <div class="card">
         <h2>Dịch vụ (Blox Fruit)</h2>
-        <div class="muted">Dịch vụ được chia theo mục. Nhấn “Mua” để trừ số dư và lưu lịch sử.</div>
+        <div class="muted">Nhập ghi chú cho đơn (acc/yêu cầu/giờ làm...) rồi bấm Mua.</div>
         <div id="services"></div>
       </div>
 
@@ -85,22 +85,9 @@ btnLogout.onclick = () => {
   location.href = "/";
 };
 
-function money(n){
-  return Number(n).toLocaleString("vi-VN");
-}
-function showMsg(text){
-  msg.style.display = "block";
-  msg.innerText = text;
-}
-function badge(status){
-  return `<span class="badge ${status}">${status}</span>`;
-}
-
-async function refreshBalance(){
-  const r = await fetch("/api/balance?username=" + encodeURIComponent(username));
-  const d = await r.json();
-  uBal.textContent = money(d.balance || 0);
-}
+function money(n){ return Number(n).toLocaleString("vi-VN"); }
+function showMsg(text){ msg.style.display = "block"; msg.innerText = text; }
+function badge(status){ return `<span class="badge ${status}">${status}</span>`; }
 
 function escapeHtml(s){
   return String(s)
@@ -111,12 +98,17 @@ function escapeHtml(s){
     .replaceAll("'","&#039;");
 }
 
+async function refreshBalance(){
+  const r = await fetch("/api/balance?username=" + encodeURIComponent(username));
+  const d = await r.json();
+  uBal.textContent = money(d.balance || 0);
+}
+
 async function loadServices(){
   const r = await fetch("/api/services");
   const d = await r.json();
   const list = d.services || [];
 
-  // group by category
   const groups = {};
   for(const s of list){
     groups[s.category] = groups[s.category] || [];
@@ -125,23 +117,30 @@ async function loadServices(){
 
   let html = "";
   Object.keys(groups).forEach(cat => {
-    html += `<div class="card" style="margin-top:12px;background:rgba(12,23,45,.45)">
-      <h2 style="margin:0 0 8px 0">${escapeHtml(cat)}</h2>
-      <div class="list">
-        ${groups[cat].map(s => `
-          <div class="item">
-            <div>
-              <b>${escapeHtml(s.name)}</b>
-              ${s.note ? `<div class="muted">${escapeHtml(s.note)}</div>` : ``}
-              <div class="muted">Giá: <b>${s.price > 0 ? money(s.price) + "đ" : "IB báo giá"}</b></div>
+    html += `
+      <div class="card" style="margin-top:12px;background:rgba(12,23,45,.45)">
+        <h2 style="margin:0 0 8px 0">${escapeHtml(cat)}</h2>
+        <div class="list">
+          ${groups[cat].map(s => `
+            <div class="item">
+              <div style="flex:1">
+                <b>${escapeHtml(s.name)}</b>
+                ${s.note ? `<div class="muted">${escapeHtml(s.note)}</div>` : ``}
+                <div class="muted">Giá: <b>${s.price > 0 ? money(s.price) + "đ" : "IB báo giá"}</b></div>
+
+                <div style="margin-top:10px">
+                  <textarea class="order-note" rows="3"
+                    placeholder="Ghi chú đơn (acc, yêu cầu, thời gian...)">${""}</textarea>
+                </div>
+              </div>
+              <div>
+                <button ${s.price>0 ? "" : "disabled"} data-id="${s.id}">Mua</button>
+              </div>
             </div>
-            <div>
-              <button ${s.price>0 ? "" : "disabled"} data-id="${s.id}">Mua</button>
-            </div>
-          </div>
-        `).join("")}
+          `).join("")}
+        </div>
       </div>
-    </div>`;
+    `;
   });
 
   services.innerHTML = html;
@@ -149,14 +148,17 @@ async function loadServices(){
   services.querySelectorAll("button[data-id]").forEach(btn => {
     btn.onclick = async () => {
       const serviceId = btn.getAttribute("data-id");
+      const note = btn.closest(".item").querySelector(".order-note")?.value || "";
+
       const r2 = await fetch("/api/orders", {
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ username, serviceId })
+        body: JSON.stringify({ username, serviceId, note })
       });
       const o = await r2.json();
       if(!o.ok) return showMsg(o.msg || "Mua thất bại");
-      showMsg("Mua thành công!");
+
+      showMsg("Mua thành công! Admin sẽ chuyển trạng thái khi đang làm/hoàn thành.");
       await refreshBalance();
       await loadOrders();
     };
@@ -194,14 +196,15 @@ async function loadOrders(){
     <div class="item">
       <div>
         <b>${escapeHtml(o.serviceName)}</b> ${badge(o.status)}
-        ${o.note ? `<div class="muted">${escapeHtml(o.note)}</div>` : ``}
+        <div class="muted">Mục: ${escapeHtml(o.category || "")}</div>
+        ${o.note ? `<div class="muted">📝 ${escapeHtml(o.note)}</div>` : ``}
         <div class="muted">${money(o.amount)}đ • ${new Date(o.createdAt).toLocaleString()}</div>
       </div>
     </div>
   `).join("");
 }
 
-// ==== TOPUP create ====
+// ===== TOPUP create =====
 let lastTopupId = null;
 
 function showTopupBox(html){
@@ -225,9 +228,9 @@ btnCreateTopup.onclick = async () => {
   btnIHavePaid.disabled = false;
 
   showTopupBox(
-    `Mã nạp của bạn: <span class="code">${d.topup.code}</span>\n` +
-    `Hãy chuyển khoản với <b>Nội dung</b>: <span class="code">${d.topup.code}</span>\n` +
-    `Admin sẽ duyệt sau khi kiểm tra giao dịch.`
+    `<div>Mã nạp của bạn: <span class="code">${d.topup.code}</span></div>
+     <div>Chuyển khoản với <b>Nội dung</b>: <span class="code">${d.topup.code}</span></div>
+     <div class="muted">Admin sẽ duyệt sau khi kiểm tra giao dịch.</div>`
   );
 
   await loadTopups();
@@ -246,4 +249,4 @@ btnIHavePaid.onclick = async () => {
 })();
 </script>
 </body>
-                </html>
+</html>
