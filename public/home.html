@@ -3,250 +3,250 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Home</title>
-  <link rel="stylesheet" href="/app.css" />
+  <title>Home - Shop Gà Con</title>
+  <link rel="stylesheet" href="app.css" />
 </head>
-<body>
+<body class="page">
   <div class="container">
-    <div class="nav">
-      <div class="brand">
-        <div class="logo"></div>
-        <h1>SHOP-GACON</h1>
+    <div class="topbar">
+      <div>
+        <b>Shop Gà Con</b>
+        <div id="welcome" class="muted" style="font-size:12px">...</div>
       </div>
-      <div class="right">
-        <div class="pill">User: <b id="uName">-</b></div>
-        <div class="pill">Số dư: <b id="uBal">0</b>đ</div>
-        <button class="btn-secondary" id="btnLogout">Đăng xuất</button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a class="btn" href="admin.html">Admin</a>
+        <button class="btn" id="btnLogout">Đăng xuất</button>
       </div>
     </div>
 
-    <div class="grid">
-      <div class="card">
-        <h2>Dịch vụ (Blox Fruit)</h2>
-        <div class="muted">Nhập ghi chú cho đơn (acc/yêu cầu/giờ làm...) rồi bấm Mua.</div>
-        <div id="services"></div>
+    <div class="row" style="margin-top:14px">
+      <div class="col" style="flex:1.6">
+        <div class="card">
+          <h2>Bảng dịch vụ</h2>
+          <div class="muted" style="font-size:12px">Nhập ghi chú (acc/yêu cầu/thời gian) → bấm Mua/Tạo đơn. Dịch vụ giá 0 sẽ là “IB báo giá”.</div>
+          <div class="hr"></div>
+          <div id="services">Đang tải...</div>
+        </div>
       </div>
 
-      <div>
+      <div class="col" style="flex:1">
         <div class="card">
-          <h2>Nạp tiền (MB Bank)</h2>
-          <div class="muted">Chuyển khoản theo QR và nhập đúng <b>nội dung</b> để admin duyệt nhanh.</div>
+          <h2>Nạp tiền (QR)</h2>
+          <div class="muted" style="font-size:12px">
+            Quét QR, chuyển khoản xong gửi “Yêu cầu nạp” để admin duyệt cộng số dư.
+          </div>
 
           <div class="hr"></div>
 
-          <div class="bank-box">
-            <div>
-              <div><b>Ngân hàng:</b> MB Bank</div>
-              <div><b>Chủ TK:</b> VAN VIET THANH NHAN</div>
-              <div><b>Số TK:</b> 7475040109</div>
-              <div class="muted">Tạo mã nạp bên dưới, copy đúng vào “Nội dung chuyển khoản”.</div>
-            </div>
-            <div class="bank-qr">
-              <img src="/mb-qr.jpg" alt="QR MB Bank" />
-            </div>
+          <img src="mb-pr.jpg" alt="MB QR" style="width:100%;border-radius:14px;border:1px solid rgba(255,255,255,.10)" />
+
+          <div class="field">
+            <label>Số tiền muốn nạp (VND)</label>
+            <input id="topAmount" type="number" placeholder="vd: 10000" />
           </div>
-
-          <div class="row">
-            <input id="topupAmount" type="number" placeholder="Số tiền cần nạp (VD: 50000)" />
-            <button id="btnCreateTopup">Tạo mã nạp</button>
+          <div class="field">
+            <label>Nội dung chuyển khoản (để admin đối chiếu)</label>
+            <input id="topNote" placeholder="vd: NAP GACON user123 10k" />
           </div>
+          <button class="btn primary" id="btnTopup">Gửi yêu cầu nạp</button>
+          <div id="topMsg" class="muted" style="margin-top:10px"></div>
 
-          <div id="topupResult" class="note" style="display:none"></div>
+          <div class="hr"></div>
 
-          <div class="row">
-            <button id="btnIHavePaid" class="btn-secondary" disabled>Tôi đã chuyển khoản</button>
-          </div>
+          <h2>Lịch sử</h2>
+          <button class="btn" id="btnReload">Tải lại đơn + nạp</button>
+          <div id="history" style="margin-top:10px">...</div>
         </div>
-
-        <div class="card section-title">
-          <h2>Lịch sử nạp</h2>
-          <div id="topupHistory" class="list"></div>
-        </div>
-
-        <div class="card section-title">
-          <h2>Lịch sử mua</h2>
-          <div id="orderHistory" class="list"></div>
-        </div>
-
-        <div id="msg" class="note" style="display:none"></div>
       </div>
     </div>
   </div>
 
-<script>
-const username = localStorage.getItem("username");
-if(!username) location.href = "/";
+  <a class="msg-float" target="_blank" href="https://www.facebook.com/share/1ajgzqUGdh/" title="Liên hệ Facebook">💬</a>
 
-uName.textContent = username;
+  <script>
+    function token(){ return localStorage.getItem("token") || ""; }
 
-btnLogout.onclick = () => {
-  localStorage.removeItem("username");
-  localStorage.removeItem("gmail");
-  location.href = "/";
-};
+    async function api(path, method="GET", body=null){
+      const headers = {};
+      if (token()) headers["Authorization"] = "Bearer " + token();
+      if (body) headers["Content-Type"] = "application/json";
+      const res = await fetch(path, { method, headers, body: body?JSON.stringify(body):null });
+      return res.json();
+    }
+    function money(v){ return (Number(v||0)).toLocaleString("vi-VN") + "đ"; }
+    function esc(s){
+      return String(s||"")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;");
+    }
 
-function money(n){ return Number(n).toLocaleString("vi-VN"); }
-function showMsg(text){ msg.style.display = "block"; msg.innerText = text; }
-function badge(status){ return `<span class="badge ${status}">${status}</span>`; }
+    // Auth check
+    (async () => {
+      if(!token()) return location.href="index.html";
+      const me = await api("/api/me");
+      if(!me.ok) return location.href="index.html";
+      if(me.user.role !== "user") return location.href="admin-dashboard.html";
 
-function escapeHtml(s){
-  return String(s)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
+      document.getElementById("welcome").textContent =
+        `Xin chào ${me.user.username} • Số dư: ${money(me.user.balance)}`;
 
-async function refreshBalance(){
-  const r = await fetch("/api/balance?username=" + encodeURIComponent(username));
-  const d = await r.json();
-  uBal.textContent = money(d.balance || 0);
-}
+      await loadServices();
+      await loadHistory();
+    })();
 
-async function loadServices(){
-  const r = await fetch("/api/services");
-  const d = await r.json();
-  const list = d.services || [];
+    document.getElementById("btnLogout").onclick = () => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("me");
+      location.href = "index.html";
+    };
 
-  const groups = {};
-  for(const s of list){
-    groups[s.category] = groups[s.category] || [];
-    groups[s.category].push(s);
-  }
+    async function loadServices(){
+      const box = document.getElementById("services");
+      box.innerHTML = "Đang tải...";
+      const data = await api("/api/services");
+      if(!data.ok){ box.innerHTML = "Lỗi tải dịch vụ"; return; }
 
-  let html = "";
-  Object.keys(groups).forEach(cat => {
-    html += `
-      <div class="card" style="margin-top:12px;background:rgba(12,23,45,.45)">
-        <h2 style="margin:0 0 8px 0">${escapeHtml(cat)}</h2>
-        <div class="list">
-          ${groups[cat].map(s => `
-            <div class="item">
-              <div style="flex:1">
-                <b>${escapeHtml(s.name)}</b>
-                ${s.note ? `<div class="muted">${escapeHtml(s.note)}</div>` : ``}
-                <div class="muted">Giá: <b>${s.price > 0 ? money(s.price) + "đ" : "IB báo giá"}</b></div>
+      const list = data.services || [];
+      if(!list.length){
+        box.innerHTML = "<div class='muted'>Chưa có dịch vụ. (Bạn cần dán services vào Data.json)</div>";
+        return;
+      }
 
-                <div style="margin-top:10px">
-                  <textarea class="order-note" rows="3"
-                    placeholder="Ghi chú đơn (acc, yêu cầu, thời gian...)">${""}</textarea>
+      // Group by category
+      const groups = {};
+      for(const s of list){
+        const key = s.category || "Khác";
+        groups[key] = groups[key] || [];
+        groups[key].push(s);
+      }
+
+      let html = "";
+      for(const cat of Object.keys(groups)){
+        html += `
+          <div class="card" style="margin-bottom:12px;background:rgba(0,0,0,.15)">
+            <b>${esc(cat)}</b>
+            <div class="hr"></div>
+        `;
+
+        for(const s of groups[cat]){
+          const disabled = Number(s.price) <= 0;
+          html += `
+            <div style="border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;margin-bottom:10px">
+              <div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between">
+                <div style="flex:1">
+                  <div style="font-weight:700">${esc(s.title)}</div>
+                  ${s.desc ? `<div class="muted" style="font-size:12px;margin-top:4px">${esc(s.desc)}</div>` : ``}
+                  <div class="muted" style="font-size:12px;margin-top:6px">
+                    Giá: <b>${disabled ? "IB báo giá" : money(s.price)}</b>
+                  </div>
+
+                  <div class="field" style="margin:10px 0 0">
+                    <label>Ghi chú đơn</label>
+                    <textarea id="note_${esc(s.id)}" placeholder="VD: acc/mật khẩu, yêu cầu, thời gian rảnh..."></textarea>
+                  </div>
+                </div>
+
+                <div style="min-width:140px;display:flex;flex-direction:column;gap:8px">
+                  <button class="btn primary" ${disabled ? "disabled" : ""} onclick="createOrder('${esc(s.id)}')">
+                    ${disabled ? "IB" : "Tạo đơn"}
+                  </button>
                 </div>
               </div>
-              <div>
-                <button ${s.price>0 ? "" : "disabled"} data-id="${s.id}">Mua</button>
-              </div>
             </div>
-          `).join("")}
-        </div>
-      </div>
-    `;
-  });
+          `;
+        }
 
-  services.innerHTML = html;
+        html += `</div>`;
+      }
 
-  services.querySelectorAll("button[data-id]").forEach(btn => {
-    btn.onclick = async () => {
-      const serviceId = btn.getAttribute("data-id");
-      const note = btn.closest(".item").querySelector(".order-note")?.value || "";
+      box.innerHTML = html;
+    }
 
-      const r2 = await fetch("/api/orders", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ username, serviceId, note })
-      });
-      const o = await r2.json();
-      if(!o.ok) return showMsg(o.msg || "Mua thất bại");
+    window.createOrder = async (serviceId) => {
+      const noteEl = document.getElementById("note_" + serviceId);
+      const note = noteEl ? noteEl.value.trim() : "";
 
-      showMsg("Mua thành công! Admin sẽ chuyển trạng thái khi đang làm/hoàn thành.");
-      await refreshBalance();
-      await loadOrders();
+      const data = await api("/api/orders", "POST", { serviceId, note });
+      if(!data.ok){
+        alert("Lỗi tạo đơn: " + data.error);
+        return;
+      }
+      alert("Tạo đơn thành công! Trạng thái: " + data.order.status);
+      if(noteEl) noteEl.value = "";
+      await loadHistory();
     };
-  });
-}
 
-async function loadTopups(){
-  const r = await fetch("/api/topups?username=" + encodeURIComponent(username));
-  const d = await r.json();
-  const list = d.topups || [];
-  if(!list.length){
-    topupHistory.innerHTML = `<div class="muted">Chưa có giao dịch nạp.</div>`;
-    return;
-  }
-  topupHistory.innerHTML = list.map(t => `
-    <div class="item">
-      <div>
-        <b>${money(t.amount)}đ</b> ${badge(t.status)}
-        <div class="muted">Mã nội dung: <span class="code">${t.code}</span></div>
-        <div class="muted">${new Date(t.createdAt).toLocaleString()}</div>
-      </div>
-    </div>
-  `).join("");
-}
+    document.getElementById("btnTopup").onclick = async () => {
+      const amount = Number(document.getElementById("topAmount").value || 0);
+      const transferNote = document.getElementById("topNote").value.trim();
+      const msg = document.getElementById("topMsg");
+      msg.textContent = "Đang gửi...";
 
-async function loadOrders(){
-  const r = await fetch("/api/orders?username=" + encodeURIComponent(username));
-  const d = await r.json();
-  const list = d.orders || [];
-  if(!list.length){
-    orderHistory.innerHTML = `<div class="muted">Chưa có lịch sử mua.</div>`;
-    return;
-  }
-  orderHistory.innerHTML = list.map(o => `
-    <div class="item">
-      <div>
-        <b>${escapeHtml(o.serviceName)}</b> ${badge(o.status)}
-        <div class="muted">Mục: ${escapeHtml(o.category || "")}</div>
-        ${o.note ? `<div class="muted">📝 ${escapeHtml(o.note)}</div>` : ``}
-        <div class="muted">${money(o.amount)}đ • ${new Date(o.createdAt).toLocaleString()}</div>
-      </div>
-    </div>
-  `).join("");
-}
+      const data = await api("/api/topups", "POST", { amount, method: "MB/Bank", transferNote });
+      if(!data.ok){
+        msg.textContent = "Lỗi: " + data.error;
+        return;
+      }
+      msg.textContent = "Đã gửi yêu cầu nạp. Chờ admin duyệt.";
+      await loadHistory();
+    };
 
-// ===== TOPUP create =====
-let lastTopupId = null;
+    document.getElementById("btnReload").onclick = () => loadHistory();
 
-function showTopupBox(html){
-  topupResult.style.display = "block";
-  topupResult.innerHTML = html;
-}
+    async function loadHistory(){
+      const box = document.getElementById("history");
+      box.innerHTML = "Đang tải...";
 
-btnCreateTopup.onclick = async () => {
-  const amount = Number(topupAmount.value || 0);
-  if(amount < 1000) return showMsg("Nhập số tiền >= 1.000đ");
+      const [orders, topups, me] = await Promise.all([
+        api("/api/orders"),
+        api("/api/topups"),
+        api("/api/me")
+      ]);
 
-  const r = await fetch("/api/topups", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ username, amount })
-  });
-  const d = await r.json();
-  if(!d.ok) return showMsg(d.msg || "Lỗi tạo mã nạp");
+      if(me.ok){
+        document.getElementById("welcome").textContent =
+          `Xin chào ${me.user.username} • Số dư: ${money(me.user.balance)}`;
+      }
 
-  lastTopupId = d.topup.id;
-  btnIHavePaid.disabled = false;
+      let html = "";
 
-  showTopupBox(
-    `<div>Mã nạp của bạn: <span class="code">${d.topup.code}</span></div>
-     <div>Chuyển khoản với <b>Nội dung</b>: <span class="code">${d.topup.code}</span></div>
-     <div class="muted">Admin sẽ duyệt sau khi kiểm tra giao dịch.</div>`
-  );
+      html += `<b>Đơn hàng</b><div class="muted" style="font-size:12px;margin:6px 0 10px">Có trạng thái + ghi chú admin.</div>`;
+      if(orders.ok && orders.orders.length){
+        html += `<table class="table">
+          <thead><tr><th>Mã</th><th>Dịch vụ</th><th>Giá</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead><tbody>`;
+        for(const o of orders.orders){
+          html += `<tr>
+            <td>${esc(o.id)}</td>
+            <td><b>${esc(o.serviceTitle)}</b><div class="muted" style="font-size:12px">${esc(o.note||"")}</div></td>
+            <td>${money(o.price)}</td>
+            <td><span class="badge">${esc(o.status)}</span></td>
+            <td class="muted" style="font-size:12px">${esc(o.adminNote||"")}</td>
+          </tr>`;
+        }
+        html += `</tbody></table>`;
+      } else html += `<div class="muted">Chưa có đơn.</div>`;
 
-  await loadTopups();
-};
+      html += `<div class="hr"></div>`;
+      html += `<b>Yêu cầu nạp</b><div class="muted" style="font-size:12px;margin:6px 0 10px">Admin duyệt sẽ cộng tiền.</div>`;
+      if(topups.ok && topups.topups.length){
+        html += `<table class="table">
+          <thead><tr><th>Mã</th><th>Số tiền</th><th>Trạng thái</th><th>Nội dung CK</th><th>Admin</th></tr></thead><tbody>`;
+        for(const t of topups.topups){
+          html += `<tr>
+            <td>${esc(t.id)}</td>
+            <td>${money(t.amount)}</td>
+            <td><span class="badge">${esc(t.status)}</span></td>
+            <td class="muted" style="font-size:12px">${esc(t.transferNote||"")}</td>
+            <td class="muted" style="font-size:12px">${esc(t.adminNote||"")}</td>
+          </tr>`;
+        }
+        html += `</tbody></table>`;
+      } else html += `<div class="muted">Chưa có yêu cầu nạp.</div>`;
 
-btnIHavePaid.onclick = async () => {
-  if(!lastTopupId) return showMsg("Bạn chưa tạo mã nạp");
-  showMsg("Đã ghi nhận. Vui lòng chờ admin duyệt.");
-};
-
-(async function init(){
-  await refreshBalance();
-  await loadServices();
-  await loadTopups();
-  await loadOrders();
-})();
-</script>
+      box.innerHTML = html;
+    }
+  </script>
 </body>
-</html>
+  </html>
