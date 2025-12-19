@@ -14,25 +14,37 @@
         <h1>ADMIN DASHBOARD</h1>
       </div>
       <div class="right">
+        <button class="btn-secondary" id="btnRefresh">Refresh</button>
         <button class="btn-secondary" id="btnAdminLogout">Đăng xuất</button>
       </div>
     </div>
 
     <div class="grid">
       <div class="card">
-        <h2>Yêu cầu nạp (PENDING)</h2>
-        <div class="muted">Admin kiểm tra giao dịch ngân hàng rồi bấm “Duyệt”.</div>
+        <h2>Topup PENDING</h2>
+        <div class="muted">Kiểm tra ngân hàng xong bấm duyệt (cộng tiền).</div>
         <div id="pendingTopups" class="list"></div>
       </div>
 
       <div>
         <div class="card">
-          <h2>Danh sách Users</h2>
+          <h2>Users</h2>
+          <div class="muted">Có thể set balance hoặc xoá user.</div>
           <div id="users" class="list"></div>
+
+          <div class="hr"></div>
+          <h2>Thao tác nhanh</h2>
+          <div class="row">
+            <input id="opUser" placeholder="username" />
+            <input id="opBal" type="number" placeholder="balance mới (VND)" />
+            <button id="btnSetBal">Set Balance</button>
+            <button id="btnDelUser" class="btn-danger">Xoá User</button>
+          </div>
+          <div id="msg" class="note" style="display:none"></div>
         </div>
 
-        <div class="card" style="margin-top:14px">
-          <h2>Lịch sử mua</h2>
+        <div class="card section-title">
+          <h2>Orders</h2>
           <div id="orders" class="list"></div>
         </div>
       </div>
@@ -44,96 +56,132 @@ const adminUser = localStorage.getItem("adminUser");
 const adminPass = localStorage.getItem("adminPass");
 if(!adminUser || !adminPass) location.href = "/admin.html";
 
-document.getElementById("btnAdminLogout").onclick = () => {
+function badge(status){ return `<span class="badge ${status}">${status}</span>`; }
+function money(n){ return Number(n).toLocaleString("vi-VN"); }
+function showMsg(t){ msg.style.display="block"; msg.innerText=t; }
+
+btnAdminLogout.onclick = () => {
   localStorage.removeItem("adminUser");
   localStorage.removeItem("adminPass");
   location.href = "/admin.html";
 };
+btnRefresh.onclick = () => loadSummary();
 
-function badge(status){ return `<span class="badge ${status}">${status}</span>`; }
-
-async function loadSummary(){
-  const r = await fetch("/api/admin/summary", {
+async function api(path, body){
+  const r = await fetch(path, {
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ adminUser, adminPass })
+    body: JSON.stringify({ adminUser, adminPass, ...body })
   });
-  const data = await r.json();
-  if(!data.ok) { alert("Sai admin"); location.href="/admin.html"; return; }
+  return r.json();
+}
 
-  renderTopups(data.topups || []);
-  renderUsers(data.users || []);
-  renderOrders(data.orders || []);
+async function loadSummary(){
+  const r = await api("/api/admin/summary", {});
+  if(!r.ok){ alert("Sai admin"); return location.href="/admin.html"; }
+
+  renderTopups(r.topups || []);
+  renderUsers(r.users || []);
+  renderOrders(r.orders || []);
 }
 
 function renderTopups(items){
   const pend = items.filter(t => t.status === "PENDING");
-  const el = document.getElementById("pendingTopups");
   if(!pend.length){
-    el.innerHTML = `<div class="muted">Không có yêu cầu nạp chờ duyệt.</div>`;
+    pendingTopups.innerHTML = `<div class="muted">Không có topup chờ duyệt.</div>`;
     return;
   }
-  el.innerHTML = pend.map(t => `
+  pendingTopups.innerHTML = pend.map(t => `
     <div class="item">
       <div>
-        <b>${t.username}</b> • ${Number(t.amount).toLocaleString()}đ ${badge(t.status)}
-        <div class="muted">Mã nội dung: <span class="code">${t.code}</span></div>
+        <b>${t.username}</b> • <b>${money(t.amount)}đ</b> ${badge(t.status)}
+        <div class="muted">Nội dung: <span class="code">${t.code}</span></div>
         <div class="muted">${new Date(t.createdAt).toLocaleString()}</div>
       </div>
-      <div>
-        <button data-id="${t.id}">Duyệt</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button data-approve="${t.id}">Duyệt</button>
+        <button class="btn-secondary" data-reject="${t.id}">Từ chối</button>
       </div>
     </div>
   `).join("");
 
-  el.querySelectorAll("button").forEach(btn=>{
+  pendingTopups.querySelectorAll("button[data-approve]").forEach(btn=>{
     btn.onclick = async () => {
-      const topupId = btn.getAttribute("data-id");
-      const r2 = await fetch("/api/admin/topups/approve", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ adminUser, adminPass, topupId })
-      });
-      const d2 = await r2.json();
-      if(!d2.ok) return alert(d2.msg || "Duyệt thất bại");
-      alert("✅ Đã duyệt và cộng tiền");
+      const id = btn.getAttribute("data-approve");
+      const d = await api("/api/admin/topups/approve", { topupId: id });
+      if(!d.ok) return alert(d.msg || "Duyệt thất bại");
+      await loadSummary();
+    };
+  });
+
+  pendingTopups.querySelectorAll("button[data-reject]").forEach(btn=>{
+    btn.onclick = async () => {
+      const id = btn.getAttribute("data-reject");
+      const d = await api("/api/admin/topups/reject", { topupId: id });
+      if(!d.ok) return alert(d.msg || "Từ chối thất bại");
       await loadSummary();
     };
   });
 }
 
 function renderUsers(items){
-  const el = document.getElementById("users");
   if(!items.length){
-    el.innerHTML = `<div class="muted">Chưa có user.</div>`;
+    users.innerHTML = `<div class="muted">Chưa có user.</div>`;
     return;
   }
-  el.innerHTML = items.map(u => `
+  users.innerHTML = items.map(u => `
     <div class="item">
       <div>
         <b>${u.username}</b>
         <div class="muted">${u.gmail || ""}</div>
+        <div class="muted">Created: ${u.createdAt || ""}</div>
       </div>
-      <div class="pill">Balance: <b>${Number(u.balance||0).toLocaleString()}đ</b></div>
+      <div class="pill">Balance: <b>${money(u.balance || 0)}đ</b></div>
     </div>
   `).join("");
 }
 
 function renderOrders(items){
-  const el = document.getElementById("orders");
   if(!items.length){
-    el.innerHTML = `<div class="muted">Chưa có đơn mua.</div>`;
+    orders.innerHTML = `<div class="muted">Chưa có order.</div>`;
     return;
   }
-  el.innerHTML = items.slice(0, 20).map(o => `
+  orders.innerHTML = items.slice(0, 50).map(o => `
     <div class="item">
       <div>
-        <b>${o.username}</b> mua <b>${o.serviceName}</b> ${badge(o.status)}
-        <div class="muted">${Number(o.amount).toLocaleString()}đ • ${new Date(o.createdAt).toLocaleString()}</div>
+        <b>${o.username}</b> • ${badge(o.status)}
+        <div><b>${o.serviceName}</b> <span class="muted">(${o.category})</span></div>
+        ${o.note ? `<div class="muted">${o.note}</div>` : ``}
+        <div class="muted">${money(o.amount)}đ • ${new Date(o.createdAt).toLocaleString()}</div>
       </div>
     </div>
   `).join("");
 }
+
+btnSetBal.onclick = async () => {
+  const u = opUser.value.trim();
+  const b = Number(opBal.value);
+  if(!u) return showMsg("Thiếu username");
+  if(!Number.isFinite(b) || b < 0) return showMsg("Balance không hợp lệ");
+
+  const d = await api("/api/admin/set-balance", { username: u, balance: b });
+  if(!d.ok) return showMsg(d.msg || "Set balance lỗi");
+  showMsg("Đã set balance");
+  await loadSummary();
+};
+
+btnDelUser.onclick = async () => {
+  const u = opUser.value.trim();
+  if(!u) return showMsg("Thiếu username");
+
+  const ok = confirm("Xoá user sẽ xoá cả lịch sử mua/nạp. Bạn chắc chưa?");
+  if(!ok) return;
+
+  const d = await api("/api/admin/delete-user", { username: u });
+  if(!d.ok) return showMsg(d.msg || "Xoá lỗi");
+  showMsg("Đã xoá user. Removed=" + d.removed);
+  await loadSummary();
+};
 
 loadSummary();
 </script>
