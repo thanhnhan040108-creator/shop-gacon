@@ -3,55 +3,61 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin Login</title>
-  <link rel="stylesheet" href="/app.css" />
+  <title>Admin Login - Shop Gà Con</title>
+  <link rel="stylesheet" href="app.css" />
 </head>
-<body>
+<body class="page">
   <div class="container">
-    <div class="nav">
-      <div class="brand">
-        <div class="logo"></div>
-        <h1>ADMIN</h1>
+    <div class="topbar">
+      <div>
+        <b>Admin</b>
+        <div class="muted" style="font-size:12px">Đăng nhập admin để vào Dashboard</div>
       </div>
-      <div class="right">
-        <a class="pill" href="/">User</a>
-      </div>
+      <a class="btn" href="index.html">User</a>
     </div>
 
-    <div class="card" style="margin-top:14px">
+    <div class="card" style="margin-top:14px;max-width:520px">
       <h2>Đăng nhập Admin</h2>
-      <div class="muted">Admin lấy từ Render Environment Variables (ADMIN_USER/ADMIN_PASS).</div>
-      <div class="row">
-        <input id="aUser" placeholder="Admin user" />
-        <input id="aPass" type="password" placeholder="Admin pass" />
-        <button id="btnAdminLogin">Đăng nhập</button>
+      <div class="field">
+        <label>Admin user</label>
+        <input id="a_user" value="admin" />
       </div>
-      <div id="msg" class="note" style="display:none"></div>
+      <div class="field">
+        <label>Admin pass</label>
+        <input id="a_pass" type="password" value="admin" />
+      </div>
+      <button class="btn primary" id="btnAdminLogin">Vào Dashboard</button>
+      <div id="msg" class="muted" style="margin-top:10px"></div>
     </div>
   </div>
 
-<script>
-function show(text){
-  msg.style.display = "block";
-  msg.innerText = text;
-}
+  <a class="msg-float" target="_blank" href="https://www.facebook.com/share/1ajgzqUGdh/" title="Liên hệ Facebook">💬</a>
 
-btnAdminLogin.onclick = async () => {
-  const adminUser = aUser.value.trim();
-  const adminPass = aPass.value.trim();
+  <script>
+    async function api(path, method="GET", body=null){
+      const res = await fetch(path, {
+        method,
+        headers: body ? {"Content-Type":"application/json"} : {},
+        body: body ? JSON.stringify(body) : null
+      });
+      return res.json();
+    }
 
-  const r = await fetch("/api/admin/summary", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ adminUser, adminPass })
-  });
-  const d = await r.json();
-  if(!d.ok) return show("Sai admin");
+    document.getElementById("btnAdminLogin").onclick = async () => {
+      const username = document.getElementById("a_user").value.trim();
+      const password = document.getElementById("a_pass").value.trim();
+      const msg = document.getElementById("msg");
+      msg.textContent = "Đang đăng nhập...";
 
-  localStorage.setItem("adminUser", adminUser);
-  localStorage.setItem("adminPass", adminPass);
-  location.href = "/admin-dashboard.html";
-};
-</script>
+      const data = await api("/api/login","POST",{username,password});
+      if(!data.ok || data.user.role !== "admin"){
+        msg.textContent = "Sai admin hoặc không có quyền.";
+        return;
+      }
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("me", JSON.stringify(data.user));
+      location.href = "admin-dashboard.html";
+    };
+  </script>
 </body>
 </html>
