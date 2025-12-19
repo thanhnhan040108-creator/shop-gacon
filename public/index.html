@@ -1,98 +1,115 @@
-        <!doctype html>
+<!doctype html>
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Shop Gà Con - Đăng nhập</title>
-  <link rel="stylesheet" href="app.css" />
+  <title>Shop - Đăng nhập</title>
+  <link rel="stylesheet" href="/app.css" />
 </head>
-<body class="page">
+<body>
   <div class="container">
-    <div class="topbar">
-      <div>
-        <b>Shop Gà Con</b>
-        <div class="muted" style="font-size:12px">Đăng nhập user để vào Home</div>
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <h1>SHOP-GACON</h1>
       </div>
-      <a class="btn" href="admin.html">Admin</a>
-    </div>
-
-    <div class="row" style="margin-top:14px">
-      <div class="col">
-        <div class="card">
-          <h2>Đăng nhập</h2>
-          <div class="field">
-            <label>Tên đăng nhập</label>
-            <input id="l_user" placeholder="vd: thanhnhan" />
-          </div>
-          <div class="field">
-            <label>Mật khẩu</label>
-            <input id="l_pass" type="password" placeholder="••••••" />
-          </div>
-          <button class="btn primary" id="btnLogin">Đăng nhập</button>
-          <div id="loginMsg" class="muted" style="margin-top:10px"></div>
-        </div>
-      </div>
-
-      <div class="col">
-        <div class="card">
-          <h2>Đăng ký</h2>
-          <div class="field">
-            <label>Tên đăng nhập</label>
-            <input id="r_user" placeholder="vd: user123" />
-          </div>
-          <div class="field">
-            <label>Mật khẩu</label>
-            <input id="r_pass" type="password" placeholder="••••••" />
-          </div>
-          <button class="btn" id="btnRegister">Tạo tài khoản</button>
-          <div id="regMsg" class="muted" style="margin-top:10px"></div>
-        </div>
+      <div class="right">
+        <a class="pill" href="/admin.html">Admin</a>
       </div>
     </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Đăng nhập</h2>
+        <div class="row">
+          <input id="loginUser" placeholder="Tên tài khoản" />
+          <input id="loginPass" type="password" placeholder="Mật khẩu" />
+          <button id="btnLogin">Đăng nhập</button>
+        </div>
+        <div id="loginMsg" class="note" style="display:none"></div>
+      </div>
+
+      <div class="card">
+        <h2>Đăng ký</h2>
+        <div class="row">
+          <input id="regUser" placeholder="Tên tài khoản" />
+          <input id="regPass" type="password" placeholder="Mật khẩu (>=6 ký tự)" />
+          <input id="regGmail" placeholder="Gmail" />
+          <button id="btnRegister" class="btn-secondary">Đăng ký</button>
+        </div>
+        <div id="regMsg" class="note" style="display:none"></div>
+      </div>
+    </div>
+      <div class="card">
+        <h2>Khôi phục tài khoản</h2>
+        <div class="muted">Nhập đúng Gmail đã đăng ký để đặt lại mật khẩu.</div>
+        <div class="row">
+          <input id="fpUser" placeholder="Tên tài khoản" />
+          <input id="fpGmail" placeholder="Gmail đã đăng ký" />
+          <input id="fpNewPass" type="password" placeholder="Mật khẩu mới (>=6 ký tự)" />
+          <button id="btnReset" class="btn-secondary">Đổi mật khẩu</button>
+        </div>
+        <div id="fpMsg" class="note" style="display:none"></div>
+      </div>
+
   </div>
 
-  <a class="msg-float" target="_blank" href="https://www.facebook.com/share/1ajgzqUGdh/" title="Liên hệ Facebook">💬</a>
+<script>
+function show(id, text){
+  const el = document.getElementById(id);
+  el.style.display = "block";
+  el.innerText = text;
+}
 
-  <script>
-    async function api(path, method="GET", body=null){
-      const res = await fetch(path, {
-        method,
-        headers: body ? {"Content-Type":"application/json"} : {},
-        body: body ? JSON.stringify(body) : null
-      });
-      return res.json();
-    }
+btnLogin.onclick = async () => {
+  const username = loginUser.value.trim();
+  const password = loginPass.value.trim();
 
-    const token = localStorage.getItem("token");
-    if (token) location.href = "home.html";
+  const r = await fetch("/api/auth/login", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ username, password })
+  });
+  const d = await r.json();
+  if(!d.ok) return show("loginMsg", d.msg || "Đăng nhập thất bại");
 
-    document.getElementById("btnRegister").onclick = async () => {
-      const username = document.getElementById("r_user").value.trim();
-      const password = document.getElementById("r_pass").value.trim();
-      const msg = document.getElementById("regMsg");
-      msg.textContent = "Đang tạo...";
-      const data = await api("/api/register","POST",{username,password});
-      if(!data.ok){
-        msg.textContent = "Lỗi: " + data.error;
-        return;
-      }
-      msg.textContent = "Tạo xong. Giờ bạn đăng nhập.";
-    };
+  localStorage.setItem("username", d.user.username);
+  localStorage.setItem("gmail", d.user.gmail);
+  location.href = "/home.html";
+};
 
-    document.getElementById("btnLogin").onclick = async () => {
-      const username = document.getElementById("l_user").value.trim();
-      const password = document.getElementById("l_pass").value.trim();
-      const msg = document.getElementById("loginMsg");
-      msg.textContent = "Đang đăng nhập...";
-      const data = await api("/api/login","POST",{username,password});
-      if(!data.ok){
-        msg.textContent = "Sai tài khoản hoặc mật khẩu.";
-        return;
-      }
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("me", JSON.stringify(data.user));
-      location.href = "home.html";
-    };
-  </script>
+btnRegister.onclick = async () => {
+  const username = regUser.value.trim();
+  const password = regPass.value.trim();
+  const gmail = regGmail.value.trim();
+
+  const r = await fetch("/api/auth/register", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ username, password, gmail })
+  });
+  const d = await r.json();
+  if(!d.ok) return show("regMsg", d.msg || "Đăng ký thất bại");
+
+  show("regMsg", "Đăng ký thành công. Bạn có thể đăng nhập.");
+};
+
+btnReset.onclick = async () => {
+  const username = fpUser.value.trim();
+  const gmail = fpGmail.value.trim();
+  const newPassword = fpNewPass.value.trim();
+
+  const r = await fetch("/api/auth/reset-password", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ username, gmail, newPassword })
+  });
+  const d = await r.json();
+  if(!d.ok) return show("fpMsg", d.msg || "Khôi phục thất bại");
+
+  show("fpMsg", "Đổi mật khẩu thành công. Bạn có thể đăng nhập.");
+};
+
+</script>
 </body>
 </html>
