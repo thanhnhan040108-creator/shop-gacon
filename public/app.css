@@ -120,3 +120,26 @@ button:disabled{opacity:.5; cursor:not-allowed}
   background:#fff;
 }
 .section-title{margin-top:14px}
+.order-note{
+  width:100%;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(12,23,45,.8);
+  color:#eaf1ff;
+  outline:none;
+  resize:vertical;
+}
+
+.badge.DOING{ color:#f59e0b; border-color: rgba(245,158,11,.35); }
+.badge.DONE{ color:#22c55e; border-color: rgba(34,197,94,.35); }
+
+.status-select{
+  width:100%;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(12,23,45,.8);
+  color:#eaf1ff;
+  outline:none;
+}
