@@ -5,7 +5,21 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Home - Shop Gà Con</title>
   <link rel="stylesheet" href="app.css" />
+  <style>
+    .grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-top:14px}
+    @media (max-width:980px){.grid2{grid-template-columns:1fr}}
+    .svc-item{border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px;margin:10px 0;background:rgba(0,0,0,.12)}
+    .svc-head{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
+    .svc-title{font-weight:800}
+    .svc-price{font-weight:800}
+    .select{padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(0,0,0,.2);color:#e8eeff;outline:none}
+    .fab-message{position:fixed;right:18px;bottom:18px;width:54px;height:54px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);backdrop-filter: blur(10px);box-shadow: 0 10px 26px rgba(0,0,0,.28);color:#fff;text-decoration:none;z-index:9999}
+    .fab-message:hover{transform: translateY(-2px)}
+    .fab-message:active{transform: translateY(0px)}
+    .code{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+  </style>
 </head>
+
 <body class="page">
   <div class="container">
     <div class="topbar">
@@ -13,67 +27,76 @@
         <b>Shop Gà Con</b>
         <div id="welcome" class="muted" style="font-size:12px">...</div>
       </div>
+
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <a class="btn" href="admin.html">Admin</a>
         <button class="btn" id="btnLogout">Đăng xuất</button>
       </div>
     </div>
 
-    <div class="row" style="margin-top:14px">
-      <div class="col" style="flex:1.6">
-        <div class="card">
-          <h2>Bảng dịch vụ</h2>
-          <div class="muted" style="font-size:12px">Nhập ghi chú (acc/yêu cầu/thời gian) → bấm Mua/Tạo đơn. Dịch vụ giá 0 sẽ là “IB báo giá”.</div>
-          <div class="hr"></div>
-          <div id="services">Đang tải...</div>
+    <div class="grid2">
+      <!-- SERVICES -->
+      <div class="card">
+        <h2>Dịch vụ</h2>
+        <div class="muted" style="font-size:12px">
+          Chọn dịch vụ → ghi chú (acc/yêu cầu) → tạo đơn. Trạng thái đơn sẽ hiện ở “Lịch sử”.
         </div>
+        <div class="hr"></div>
+        <div id="services">Đang tải...</div>
       </div>
 
-      <div class="col" style="flex:1">
+      <!-- RIGHT PANEL -->
+      <div>
         <div class="card">
-          <h2>Nạp tiền (QR)</h2>
+          <h2>Nạp tiền</h2>
           <div class="muted" style="font-size:12px">
-            Quét QR, chuyển khoản xong gửi “Yêu cầu nạp” để admin duyệt cộng số dư.
+            Chọn phương thức → nhập số tiền → tạo mã → thanh toán đúng <b>Nội dung</b> (mã NAP_...).
           </div>
 
           <div class="hr"></div>
 
-          <img src="mb-pr.jpg" alt="MB QR" style="width:100%;border-radius:14px;border:1px solid rgba(255,255,255,.10)" />
+          <div class="field">
+            <label>Phương thức</label>
+            <select id="topupMethod" class="select">
+              <option value="MB" selected>MB Bank</option>
+              <option value="ZALOPAY">ZaloPay</option>
+            </select>
+          </div>
 
           <div class="field">
-            <label>Số tiền muốn nạp (VND)</label>
-            <input id="topAmount" type="number" placeholder="vd: 10000" />
+            <label>Số tiền (VND)</label>
+            <input id="topupAmount" type="number" placeholder="vd: 50000" />
           </div>
-          <div class="field">
-            <label>Nội dung chuyển khoản (để admin đối chiếu)</label>
-            <input id="topNote" placeholder="vd: NAP GACON user123 10k" />
-          </div>
-          <button class="btn primary" id="btnTopup">Gửi yêu cầu nạp</button>
+
+          <button class="btn primary" id="btnCreateTopup">Tạo mã nạp</button>
           <div id="topMsg" class="muted" style="margin-top:10px"></div>
 
           <div class="hr"></div>
 
           <h2>Lịch sử</h2>
-          <button class="btn" id="btnReload">Tải lại đơn + nạp</button>
+          <button class="btn" id="btnReload">Tải lại</button>
           <div id="history" style="margin-top:10px">...</div>
         </div>
       </div>
     </div>
   </div>
 
-  <a class="msg-float" target="_blank" href="https://www.facebook.com/share/1ajgzqUGdh/" title="Liên hệ Facebook">💬</a>
+  <!-- Nút Message -->
+  <a class="fab-message" href="https://www.facebook.com/share/1ajgzqUGdh/" target="_blank" rel="noopener" title="Nhắn tin Facebook">
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20 3H4a2 2 0 0 0-2 2v16l4-4h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor"></path>
+    </svg>
+  </a>
 
   <script>
-    function token(){ return localStorage.getItem("token") || ""; }
-
     async function api(path, method="GET", body=null){
-      const headers = {};
-      if (token()) headers["Authorization"] = "Bearer " + token();
-      if (body) headers["Content-Type"] = "application/json";
-      const res = await fetch(path, { method, headers, body: body?JSON.stringify(body):null });
+      const res = await fetch(path, {
+        method,
+        headers: body ? {"Content-Type":"application/json"} : {},
+        body: body ? JSON.stringify(body) : null
+      });
       return res.json();
     }
-    function money(v){ return (Number(v||0)).toLocaleString("vi-VN") + "đ"; }
     function esc(s){
       return String(s||"")
         .replaceAll("&","&amp;")
@@ -81,78 +104,70 @@
         .replaceAll(">","&gt;")
         .replaceAll('"',"&quot;");
     }
+    function money(n){ return Number(n||0).toLocaleString("vi-VN") + "đ"; }
+    function badge(status){
+      const t = String(status||"").toUpperCase();
+      return `<span class="badge">${esc(t)}</span>`;
+    }
 
-    // Auth check
-    (async () => {
-      if(!token()) return location.href="index.html";
-      const me = await api("/api/me");
-      if(!me.ok) return location.href="index.html";
-      if(me.user.role !== "user") return location.href="admin-dashboard.html";
+    const username = localStorage.getItem("username");
 
-      document.getElementById("welcome").textContent =
-        `Xin chào ${me.user.username} • Số dư: ${money(me.user.balance)}`;
-
-      await loadServices();
-      await loadHistory();
-    })();
+    // Nếu chưa login -> đá về index bằng đường dẫn tương đối
+    if (!username) window.location.assign("index.html");
 
     document.getElementById("btnLogout").onclick = () => {
-      localStorage.removeItem("token");
-      localStorage.removeItem("me");
-      location.href = "index.html";
+      localStorage.removeItem("username");
+      window.location.assign("index.html");
     };
 
     async function loadServices(){
       const box = document.getElementById("services");
-      box.innerHTML = "Đang tải...";
+      box.textContent = "Đang tải...";
+
       const data = await api("/api/services");
-      if(!data.ok){ box.innerHTML = "Lỗi tải dịch vụ"; return; }
+      if(!data.ok){ box.textContent = "Lỗi tải dịch vụ"; return; }
 
       const list = data.services || [];
       if(!list.length){
-        box.innerHTML = "<div class='muted'>Chưa có dịch vụ. (Bạn cần dán services vào Data.json)</div>";
+        box.innerHTML = "<div class='muted'>Chưa có dịch vụ.</div>";
         return;
       }
 
-      // Group by category
+      // group by category
       const groups = {};
       for(const s of list){
-        const key = s.category || "Khác";
-        groups[key] = groups[key] || [];
-        groups[key].push(s);
+        const cat = s.category || "Khác";
+        (groups[cat] ||= []).push(s);
       }
 
       let html = "";
       for(const cat of Object.keys(groups)){
-        html += `
-          <div class="card" style="margin-bottom:12px;background:rgba(0,0,0,.15)">
-            <b>${esc(cat)}</b>
-            <div class="hr"></div>
+        html += `<div class="card" style="margin-bottom:12px;background:rgba(0,0,0,.10)">
+          <b>${esc(cat)}</b>
+          <div class="hr"></div>
         `;
 
         for(const s of groups[cat]){
-          const disabled = Number(s.price) <= 0;
+          const isIB = Number(s.price) <= 0;
           html += `
-            <div style="border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;margin-bottom:10px">
-              <div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between">
+            <div class="svc-item">
+              <div class="svc-head">
                 <div style="flex:1">
-                  <div style="font-weight:700">${esc(s.title)}</div>
+                  <div class="svc-title">${esc(s.title)}</div>
                   ${s.desc ? `<div class="muted" style="font-size:12px;margin-top:4px">${esc(s.desc)}</div>` : ``}
-                  <div class="muted" style="font-size:12px;margin-top:6px">
-                    Giá: <b>${disabled ? "IB báo giá" : money(s.price)}</b>
-                  </div>
-
-                  <div class="field" style="margin:10px 0 0">
-                    <label>Ghi chú đơn</label>
-                    <textarea id="note_${esc(s.id)}" placeholder="VD: acc/mật khẩu, yêu cầu, thời gian rảnh..."></textarea>
-                  </div>
                 </div>
+                <div class="svc-price">${isIB ? "IB" : money(s.price)}</div>
+              </div>
 
-                <div style="min-width:140px;display:flex;flex-direction:column;gap:8px">
-                  <button class="btn primary" ${disabled ? "disabled" : ""} onclick="createOrder('${esc(s.id)}')">
-                    ${disabled ? "IB" : "Tạo đơn"}
-                  </button>
-                </div>
+              <div class="field" style="margin-top:10px">
+                <label>Ghi chú đơn</label>
+                <textarea id="note_${esc(s.id)}" placeholder="VD: acc/mk, yêu cầu, thời gian rảnh..."></textarea>
+              </div>
+
+              <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button class="btn primary" ${isIB ? "disabled" : ""} onclick="createOrder('${esc(s.id)}')">
+                  ${isIB ? "IB báo giá" : "Tạo đơn"}
+                </button>
               </div>
             </div>
           `;
@@ -168,28 +183,33 @@
       const noteEl = document.getElementById("note_" + serviceId);
       const note = noteEl ? noteEl.value.trim() : "";
 
-      const data = await api("/api/orders", "POST", { serviceId, note });
-      if(!data.ok){
-        alert("Lỗi tạo đơn: " + data.error);
-        return;
-      }
-      alert("Tạo đơn thành công! Trạng thái: " + data.order.status);
+      const data = await api("/api/orders", "POST", { username, serviceId, note });
+      if(!data.ok){ alert("Lỗi tạo đơn: " + (data.msg || data.error || "Không rõ")); return; }
+
+      alert("Tạo đơn thành công!");
       if(noteEl) noteEl.value = "";
       await loadHistory();
     };
 
-    document.getElementById("btnTopup").onclick = async () => {
-      const amount = Number(document.getElementById("topAmount").value || 0);
-      const transferNote = document.getElementById("topNote").value.trim();
+    document.getElementById("btnCreateTopup").onclick = async () => {
+      const amount = Number(document.getElementById("topupAmount").value || 0);
+      const method = (document.getElementById("topupMethod").value || "MB").toUpperCase();
       const msg = document.getElementById("topMsg");
-      msg.textContent = "Đang gửi...";
 
-      const data = await api("/api/topups", "POST", { amount, method: "MB/Bank", transferNote });
-      if(!data.ok){
-        msg.textContent = "Lỗi: " + data.error;
-        return;
-      }
-      msg.textContent = "Đã gửi yêu cầu nạp. Chờ admin duyệt.";
+      msg.textContent = "Đang tạo mã...";
+      const data = await api("/api/topups", "POST", { username, amount, method });
+      if(!data.ok){ msg.textContent = "Lỗi: " + (data.msg || data.error || "Không rõ"); return; }
+
+      const t = data.topup;
+      const m = (t.method || "MB").toUpperCase();
+
+      msg.innerHTML = `
+        <div><b>Tạo mã nạp thành công</b></div>
+        <div>Phương thức: <b>${esc(m)}</b></div>
+        <div>Nội dung chuyển khoản/ thanh toán: <span class="code">${esc(t.code)}</span></div>
+        <div class="muted" style="margin-top:6px">Admin sẽ duyệt sau khi kiểm tra.</div>
+      `;
+
       await loadHistory();
     };
 
@@ -197,23 +217,27 @@
 
     async function loadHistory(){
       const box = document.getElementById("history");
-      box.innerHTML = "Đang tải...";
+      box.textContent = "Đang tải...";
 
-      const [orders, topups, me] = await Promise.all([
-        api("/api/orders"),
-        api("/api/topups"),
-        api("/api/me")
+      const [me, orders, topups] = await Promise.all([
+        api("/api/users/" + encodeURIComponent(username)),
+        api("/api/orders?username=" + encodeURIComponent(username)),
+        api("/api/topups?username=" + encodeURIComponent(username))
       ]);
 
+      // welcome
       if(me.ok){
         document.getElementById("welcome").textContent =
           `Xin chào ${me.user.username} • Số dư: ${money(me.user.balance)}`;
+      } else {
+        document.getElementById("welcome").textContent = `Xin chào ${username}`;
       }
 
       let html = "";
 
-      html += `<b>Đơn hàng</b><div class="muted" style="font-size:12px;margin:6px 0 10px">Có trạng thái + ghi chú admin.</div>`;
-      if(orders.ok && orders.orders.length){
+      // orders
+      html += `<b>Đơn hàng</b><div class="muted" style="font-size:12px;margin:6px 0 10px">Trạng thái + ghi chú admin.</div>`;
+      if(orders.ok && (orders.orders||[]).length){
         html += `<table class="table">
           <thead><tr><th>Mã</th><th>Dịch vụ</th><th>Giá</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead><tbody>`;
         for(const o of orders.orders){
@@ -221,32 +245,44 @@
             <td>${esc(o.id)}</td>
             <td><b>${esc(o.serviceTitle)}</b><div class="muted" style="font-size:12px">${esc(o.note||"")}</div></td>
             <td>${money(o.price)}</td>
-            <td><span class="badge">${esc(o.status)}</span></td>
+            <td>${badge(o.status)}</td>
             <td class="muted" style="font-size:12px">${esc(o.adminNote||"")}</td>
           </tr>`;
         }
         html += `</tbody></table>`;
-      } else html += `<div class="muted">Chưa có đơn.</div>`;
+      } else {
+        html += `<div class="muted">Chưa có đơn.</div>`;
+      }
 
       html += `<div class="hr"></div>`;
-      html += `<b>Yêu cầu nạp</b><div class="muted" style="font-size:12px;margin:6px 0 10px">Admin duyệt sẽ cộng tiền.</div>`;
-      if(topups.ok && topups.topups.length){
+
+      // topups
+      html += `<b>Nạp tiền</b><div class="muted" style="font-size:12px;margin:6px 0 10px">Chờ admin duyệt.</div>`;
+      if(topups.ok && (topups.topups||[]).length){
         html += `<table class="table">
-          <thead><tr><th>Mã</th><th>Số tiền</th><th>Trạng thái</th><th>Nội dung CK</th><th>Admin</th></tr></thead><tbody>`;
+          <thead><tr><th>Mã</th><th>Số tiền</th><th>Method</th><th>Trạng thái</th><th>Nội dung</th></tr></thead><tbody>`;
         for(const t of topups.topups){
           html += `<tr>
             <td>${esc(t.id)}</td>
             <td>${money(t.amount)}</td>
-            <td><span class="badge">${esc(t.status)}</span></td>
-            <td class="muted" style="font-size:12px">${esc(t.transferNote||"")}</td>
-            <td class="muted" style="font-size:12px">${esc(t.adminNote||"")}</td>
+            <td><b>${esc(t.method || "MB")}</b></td>
+            <td>${badge(t.status)}</td>
+            <td class="muted" style="font-size:12px"><span class="code">${esc(t.code)}</span></td>
           </tr>`;
         }
         html += `</tbody></table>`;
-      } else html += `<div class="muted">Chưa có yêu cầu nạp.</div>`;
+      } else {
+        html += `<div class="muted">Chưa có yêu cầu nạp.</div>`;
+      }
 
       box.innerHTML = html;
     }
+
+    // Init
+    (async () => {
+      await loadServices();
+      await loadHistory();
+    })();
   </script>
 </body>
-  </html>
+</html>
