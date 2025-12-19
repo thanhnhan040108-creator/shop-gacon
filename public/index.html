@@ -3,113 +3,182 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Shop - Đăng nhập</title>
-  <link rel="stylesheet" href="/app.css" />
+  <title>Shop Gà Con - Đăng nhập</title>
+  <link rel="stylesheet" href="app.css" />
+  <style>
+    .auth-wrap{max-width:980px;margin:0 auto;padding:18px}
+    .auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+    @media (max-width:860px){.auth-grid{grid-template-columns:1fr}}
+    .small{font-size:12px}
+    .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media (max-width:520px){.row2{grid-template-columns:1fr}}
+    .pass-wrap{display:flex;gap:8px;align-items:center}
+    .icon-btn{min-width:44px;height:42px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#e8eeff;cursor:pointer}
+  </style>
 </head>
-<body>
-  <div class="container">
-    <div class="nav">
-      <div class="brand">
-        <div class="logo"></div>
-        <h1>SHOP-GACON</h1>
+
+<body class="page">
+  <div class="auth-wrap">
+    <div class="topbar">
+      <div>
+        <b>Shop Gà Con</b>
+        <div class="muted small">Đăng nhập user để vào trang Home</div>
       </div>
-      <div class="right">
-        <a class="pill" href="/admin.html">Admin</a>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a class="btn" href="admin.html">Admin</a>
+        <a class="btn" target="_blank" rel="noopener" href="https://www.facebook.com/share/1ajgzqUGdh/">Liên hệ</a>
       </div>
     </div>
 
-    <div class="grid">
+    <div class="auth-grid">
+      <!-- LOGIN -->
       <div class="card">
         <h2>Đăng nhập</h2>
-        <div class="row">
-          <input id="loginUser" placeholder="Tên tài khoản" />
-          <input id="loginPass" type="password" placeholder="Mật khẩu" />
-          <button id="btnLogin">Đăng nhập</button>
+
+        <div class="field">
+          <label>Tên tài khoản</label>
+          <input id="l_user" placeholder="vd: user123" autocomplete="username" />
         </div>
-        <div id="loginMsg" class="note" style="display:none"></div>
+
+        <div class="field">
+          <label>Mật khẩu</label>
+          <div class="pass-wrap">
+            <input id="l_pass" type="password" placeholder="••••••" autocomplete="current-password" style="flex:1" />
+            <button class="icon-btn" id="toggleLoginPass" title="Hiện/ẩn mật khẩu">👁</button>
+          </div>
+        </div>
+
+        <button class="btn primary" id="btnLogin">Đăng nhập</button>
+        <div id="loginMsg" class="muted" style="margin-top:10px"></div>
+
+        <div class="hr"></div>
+        <div class="muted small">
+          Nếu đăng nhập xong không vào Home: hãy chắc chắn file <b>home.html</b> nằm trong thư mục <b>public</b>.
+        </div>
       </div>
 
+      <!-- REGISTER + RESET -->
       <div class="card">
         <h2>Đăng ký</h2>
-        <div class="row">
-          <input id="regUser" placeholder="Tên tài khoản" />
-          <input id="regPass" type="password" placeholder="Mật khẩu (>=6 ký tự)" />
-          <input id="regGmail" placeholder="Gmail" />
-          <button id="btnRegister" class="btn-secondary">Đăng ký</button>
+
+        <div class="row2">
+          <div class="field">
+            <label>Tên tài khoản</label>
+            <input id="r_user" placeholder="vd: thanhnhan" autocomplete="username" />
+          </div>
+          <div class="field">
+            <label>Gmail (khôi phục)</label>
+            <input id="r_gmail" placeholder="vd: abc@gmail.com" autocomplete="email" />
+          </div>
         </div>
-        <div id="regMsg" class="note" style="display:none"></div>
+
+        <div class="field">
+          <label>Mật khẩu</label>
+          <div class="pass-wrap">
+            <input id="r_pass" type="password" placeholder="••••••" autocomplete="new-password" style="flex:1" />
+            <button class="icon-btn" id="toggleRegPass" title="Hiện/ẩn mật khẩu">👁</button>
+          </div>
+        </div>
+
+        <button class="btn" id="btnRegister">Tạo tài khoản</button>
+        <div id="regMsg" class="muted" style="margin-top:10px"></div>
+
+        <div class="hr"></div>
+
+        <h2>Khôi phục tài khoản</h2>
+        <div class="muted small">Nhập đúng <b>Gmail đã đăng ký</b> để đổi mật khẩu.</div>
+
+        <div class="row2" style="margin-top:10px">
+          <div class="field">
+            <label>Tên tài khoản</label>
+            <input id="fp_user" placeholder="user123" />
+          </div>
+          <div class="field">
+            <label>Gmail</label>
+            <input id="fp_gmail" placeholder="abc@gmail.com" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Mật khẩu mới</label>
+          <div class="pass-wrap">
+            <input id="fp_newpass" type="password" placeholder="••••••" style="flex:1" />
+            <button class="icon-btn" id="toggleFpPass" title="Hiện/ẩn mật khẩu">👁</button>
+          </div>
+        </div>
+
+        <button class="btn primary" id="btnReset">Đổi mật khẩu</button>
+        <div id="fpMsg" class="muted" style="margin-top:10px"></div>
       </div>
     </div>
-      <div class="card">
-        <h2>Khôi phục tài khoản</h2>
-        <div class="muted">Nhập đúng Gmail đã đăng ký để đặt lại mật khẩu.</div>
-        <div class="row">
-          <input id="fpUser" placeholder="Tên tài khoản" />
-          <input id="fpGmail" placeholder="Gmail đã đăng ký" />
-          <input id="fpNewPass" type="password" placeholder="Mật khẩu mới (>=6 ký tự)" />
-          <button id="btnReset" class="btn-secondary">Đổi mật khẩu</button>
-        </div>
-        <div id="fpMsg" class="note" style="display:none"></div>
-      </div>
-
   </div>
 
-<script>
-function show(id, text){
-  const el = document.getElementById(id);
-  el.style.display = "block";
-  el.innerText = text;
-}
+  <script>
+    async function api(path, method="GET", body=null){
+      const res = await fetch(path, {
+        method,
+        headers: body ? {"Content-Type":"application/json"} : {},
+        body: body ? JSON.stringify(body) : null
+      });
+      return res.json();
+    }
 
-btnLogin.onclick = async () => {
-  const username = loginUser.value.trim();
-  const password = loginPass.value.trim();
+    // Nếu đã có username thì vào thẳng home
+    const savedUser = localStorage.getItem("username");
+    if (savedUser) window.location.assign("home.html");
 
-  const r = await fetch("/api/auth/login", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ username, password })
-  });
-  const d = await r.json();
-  if(!d.ok) return show("loginMsg", d.msg || "Đăng nhập thất bại");
+    function togglePass(inputId){
+      const el = document.getElementById(inputId);
+      el.type = (el.type === "password") ? "text" : "password";
+    }
+    document.getElementById("toggleLoginPass").onclick = () => togglePass("l_pass");
+    document.getElementById("toggleRegPass").onclick   = () => togglePass("r_pass");
+    document.getElementById("toggleFpPass").onclick    = () => togglePass("fp_newpass");
 
-  localStorage.setItem("username", d.user.username);
-  localStorage.setItem("gmail", d.user.gmail);
-  location.href = "/home.html";
-};
+    // REGISTER
+    document.getElementById("btnRegister").onclick = async () => {
+      const username = document.getElementById("r_user").value.trim();
+      const gmail = document.getElementById("r_gmail").value.trim();
+      const password = document.getElementById("r_pass").value.trim();
+      const msg = document.getElementById("regMsg");
+      msg.textContent = "Đang tạo...";
 
-btnRegister.onclick = async () => {
-  const username = regUser.value.trim();
-  const password = regPass.value.trim();
-  const gmail = regGmail.value.trim();
+      const data = await api("/api/auth/register", "POST", { username, gmail, password });
+      if (!data.ok) { msg.textContent = "Lỗi: " + (data.msg || data.error || "Không rõ"); return; }
 
-  const r = await fetch("/api/auth/register", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ username, password, gmail })
-  });
-  const d = await r.json();
-  if(!d.ok) return show("regMsg", d.msg || "Đăng ký thất bại");
+      msg.textContent = "Tạo tài khoản thành công. Bạn có thể đăng nhập.";
+    };
 
-  show("regMsg", "Đăng ký thành công. Bạn có thể đăng nhập.");
-};
+    // LOGIN
+    document.getElementById("btnLogin").onclick = async () => {
+      const username = document.getElementById("l_user").value.trim();
+      const password = document.getElementById("l_pass").value.trim();
+      const msg = document.getElementById("loginMsg");
+      msg.textContent = "Đang đăng nhập...";
 
-btnReset.onclick = async () => {
-  const username = fpUser.value.trim();
-  const gmail = fpGmail.value.trim();
-  const newPassword = fpNewPass.value.trim();
+      const data = await api("/api/auth/login", "POST", { username, password });
+      if (!data.ok) { msg.textContent = "Sai tài khoản hoặc mật khẩu."; return; }
 
-  const r = await fetch("/api/auth/reset-password", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ username, gmail, newPassword })
-  });
-  const d = await r.json();
-  if(!d.ok) return show("fpMsg", d.msg || "Khôi phục thất bại");
+      // Lưu username để home dùng
+      localStorage.setItem("username", data.user.username);
 
-  show("fpMsg", "Đổi mật khẩu thành công. Bạn có thể đăng nhập.");
-};
+      // Chuyển trang bằng đường dẫn tương đối (KHÔNG dùng /home.html)
+      window.location.assign("home.html");
+    };
 
-</script>
+    // RESET PASSWORD
+    document.getElementById("btnReset").onclick = async () => {
+      const username = document.getElementById("fp_user").value.trim();
+      const gmail = document.getElementById("fp_gmail").value.trim();
+      const newPassword = document.getElementById("fp_newpass").value.trim();
+      const msg = document.getElementById("fpMsg");
+      msg.textContent = "Đang xử lý...";
+
+      const data = await api("/api/auth/reset-password", "POST", { username, gmail, newPassword });
+      if (!data.ok) { msg.textContent = "Lỗi: " + (data.msg || data.error || "Không rõ"); return; }
+
+      msg.textContent = "Đổi mật khẩu thành công. Giờ bạn đăng nhập lại.";
+    };
+  </script>
 </body>
-</html>
+        </html>
