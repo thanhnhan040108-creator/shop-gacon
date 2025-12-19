@@ -143,3 +143,18 @@ button:disabled{opacity:.5; cursor:not-allowed}
   color:#eaf1ff;
   outline:none;
 }
+
+
+/* Auth & inputs */
+.label{display:block; font-size:12px; color:var(--muted); margin:0 0 6px}
+.pass-wrap{position:relative}
+.pass-wrap input{padding-right:44px}
+.icon-btn{
+  position:absolute; right:8px; top:50%; transform:translateY(-50%);
+  width:34px; height:34px; border-radius:10px;
+  border:1px solid var(--line); background:rgba(255,255,255,.06);
+  color:var(--text); cursor:pointer;
+}
+.icon-btn:hover{background:rgba(255,255,255,.10)}
+.auth-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px}
+.support-box{display:flex; gap:10px; flex-wrap:wrap}
