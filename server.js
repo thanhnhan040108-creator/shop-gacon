@@ -15,13 +15,18 @@ function ensureDataFile() {
   if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(
       DATA_FILE,
-      JSON.stringify({ users: [], orders: [], topups: [] }, null, 2)
+      JSON.stringify({ users: [], orders: [], topups: [], cardTopups: [] }, null, 2)
     );
   }
 }
 function readData() {
   ensureDataFile();
-  return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+  const d = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+  d.users = d.users || [];
+  d.orders = d.orders || [];
+  d.topups = d.topups || [];
+  d.cardTopups = d.cardTopups || [];
+  return d;
 }
 function writeData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
@@ -55,12 +60,8 @@ app.post("/api/register", (req, res) => {
   const password = normStr(req.body.password);
   const email = normStr(req.body.email).toLowerCase();
 
-  if (!username || !password || !email) {
-    return res.status(400).json({ msg: "Thiếu thông tin" });
-  }
-  if (!isEmail(email)) {
-    return res.status(400).json({ msg: "Email không hợp lệ" });
-  }
+  if (!username || !password || !email) return res.status(400).json({ msg: "Thiếu thông tin" });
+  if (!isEmail(email)) return res.status(400).json({ msg: "Email không hợp lệ" });
 
   const data = readData();
   if (data.users.find((u) => u.username === username)) {
@@ -85,30 +86,21 @@ app.post("/api/login", (req, res) => {
   const password = normStr(req.body.password);
 
   const data = readData();
-  const user = data.users.find(
-    (u) => u.username === username && u.password === password
-  );
-
+  const user = data.users.find((u) => u.username === username && u.password === password);
   if (!user) return res.status(401).json({ msg: "Sai tài khoản hoặc mật khẩu" });
 
-  const safeUser = {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    balance: user.balance,
-  };
-  res.json({ user: safeUser });
+  res.json({
+    user: { id: user.id, username: user.username, email: user.email, balance: user.balance },
+  });
 });
 
-// Quên mật khẩu: xác minh username + email, đặt mật khẩu mới
+// Quên mật khẩu: username + email -> đặt mk mới
 app.post("/api/forgot", (req, res) => {
   const username = normStr(req.body.username);
   const email = normStr(req.body.email).toLowerCase();
   const newPassword = normStr(req.body.newPassword);
 
-  if (!username || !email || !newPassword) {
-    return res.status(400).json({ msg: "Thiếu thông tin" });
-  }
+  if (!username || !email || !newPassword) return res.status(400).json({ msg: "Thiếu thông tin" });
   if (!isEmail(email)) return res.status(400).json({ msg: "Email không hợp lệ" });
 
   const data = readData();
@@ -120,19 +112,13 @@ app.post("/api/forgot", (req, res) => {
   res.json({ msg: "Đổi mật khẩu thành công. Hãy đăng nhập lại." });
 });
 
-// Lấy user mới nhất (balance cập nhật)
 app.get("/api/me/:username", (req, res) => {
   const data = readData();
   const user = data.users.find((u) => u.username === req.params.username);
   if (!user) return res.status(404).json({ msg: "Không tìm thấy user" });
 
   res.json({
-    user: {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      balance: user.balance,
-    },
+    user: { id: user.id, username: user.username, email: user.email, balance: user.balance },
   });
 });
 
@@ -143,9 +129,7 @@ app.post("/api/order", (req, res) => {
   const price = Number(req.body.price || 0);
   const note = normStr(req.body.note);
 
-  if (!username || !service || !price) {
-    return res.status(400).json({ msg: "Thiếu dữ liệu tạo đơn" });
-  }
+  if (!username || !service || !price) return res.status(400).json({ msg: "Thiếu dữ liệu tạo đơn" });
 
   const data = readData();
   const user = data.users.find((u) => u.username === username);
@@ -163,7 +147,7 @@ app.post("/api/order", (req, res) => {
     paidStatus: "Chưa thanh toán",
     status: "Chờ xử lý",
     adminNote: "",
-    time: new Date().toLocaleString()
+    time: new Date().toLocaleString(),
   };
 
   data.orders.unshift(order);
@@ -176,15 +160,13 @@ app.get("/api/orders/:username", (req, res) => {
   res.json(data.orders.filter((o) => o.username === req.params.username));
 });
 
-// ===== TOPUP =====
+// ===== TOPUP (MB) =====
 app.post("/api/topup", (req, res) => {
   const username = normStr(req.body.username);
   const amount = Number(req.body.amount || 0);
   const method = normStr(req.body.method || "MB Bank");
 
-  if (!username || amount <= 0) {
-    return res.status(400).json({ msg: "Thiếu dữ liệu nạp" });
-  }
+  if (!username || amount <= 0) return res.status(400).json({ msg: "Thiếu dữ liệu nạp" });
 
   const data = readData();
   const user = data.users.find((u) => u.username === username);
@@ -204,13 +186,75 @@ app.post("/api/topup", (req, res) => {
 
   data.topups.unshift(topup);
   writeData(data);
-
   res.json({ topup });
 });
 
 app.get("/api/topups/:username", (req, res) => {
   const data = readData();
   res.json(data.topups.filter((t) => t.username === req.params.username));
+});
+
+// ===== CARD TOPUP (THẺ CÀO) =====
+function calcCardFeePercent(amount) {
+  amount = Number(amount || 0);
+  // bạn yêu cầu: 50k trở xuống 15%, >=100k 20%
+  if (amount >= 100000) return 20;
+  return 15;
+}
+
+app.post("/api/cardtopup", (req, res) => {
+  const username = normStr(req.body.username);
+  const provider = normStr(req.body.provider);
+  const amount = Number(req.body.amount || 0);
+  const serial = normStr(req.body.serial);
+  const pin = normStr(req.body.pin);
+
+  if (!username || !provider || !serial || !pin || amount <= 0) {
+    return res.status(400).json({ msg: "Thiếu dữ liệu nạp thẻ" });
+  }
+
+  const allowedProviders = ["Viettel", "Vinaphone", "Mobifone", "Garena", "Zing"];
+  if (!allowedProviders.includes(provider)) {
+    return res.status(400).json({ msg: "Nhà mạng không hợp lệ" });
+  }
+
+  // bạn yêu cầu chỉ 20k/50k/100k/200k/500k
+  const allowedAmounts = [20000, 50000, 100000, 200000, 500000];
+  if (!allowedAmounts.includes(amount)) {
+    return res.status(400).json({ msg: "Mệnh giá không hợp lệ (chỉ 20k/50k/100k/200k/500k)" });
+  }
+
+  const data = readData();
+  const user = data.users.find((u) => u.username === username);
+  if (!user) return res.status(404).json({ msg: "User không tồn tại" });
+
+  const feePercent = calcCardFeePercent(amount);
+  const netAmount = Math.floor((amount * (100 - feePercent)) / 100);
+  const code = "CARD_" + crypto.randomBytes(3).toString("hex").toUpperCase();
+
+  const card = {
+    id: newId(),
+    code,
+    username,
+    provider,
+    amount,
+    feePercent,
+    netAmount,
+    serial,
+    pin,
+    status: "Chờ duyệt",
+    adminNote: "",
+    time: new Date().toLocaleString(),
+  };
+
+  data.cardTopups.unshift(card);
+  writeData(data);
+  res.json({ card });
+});
+
+app.get("/api/cardtopups/:username", (req, res) => {
+  const data = readData();
+  res.json(data.cardTopups.filter((c) => c.username === req.params.username));
 });
 
 // ===== ADMIN =====
@@ -227,10 +271,10 @@ app.post("/api/admin/login", (req, res) => {
 });
 
 app.get("/api/admin/data", requireAdmin, (req, res) => {
-  res.json(readData());
+  const d = readData();
+  res.json(d);
 });
 
-// đổi trạng thái đơn + ghi chú admin
 app.post("/api/admin/order-update", requireAdmin, (req, res) => {
   const id = Number(req.body.id);
   const status = normStr(req.body.status);
@@ -247,7 +291,6 @@ app.post("/api/admin/order-update", requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// admin xác nhận thanh toán đơn
 app.post("/api/admin/order-paid", requireAdmin, (req, res) => {
   const id = Number(req.body.id);
   const paid = Boolean(req.body.paid);
@@ -261,7 +304,6 @@ app.post("/api/admin/order-paid", requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// xoá đơn
 app.post("/api/admin/order-delete", requireAdmin, (req, res) => {
   const id = Number(req.body.id);
   const data = readData();
@@ -270,7 +312,6 @@ app.post("/api/admin/order-delete", requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// duyệt nạp: đổi status + cộng tiền
 app.post("/api/admin/topup-approve", requireAdmin, (req, res) => {
   const id = Number(req.body.id);
   const approve = Boolean(req.body.approve);
@@ -279,9 +320,7 @@ app.post("/api/admin/topup-approve", requireAdmin, (req, res) => {
   const topup = data.topups.find((t) => t.id === id);
   if (!topup) return res.status(404).json({ msg: "Không tìm thấy topup" });
 
-  if (topup.status !== "Chờ duyệt") {
-    return res.status(400).json({ msg: "Topup đã xử lý rồi" });
-  }
+  if (topup.status !== "Chờ duyệt") return res.status(400).json({ msg: "Topup đã xử lý rồi" });
 
   if (approve) {
     topup.status = "Đã duyệt";
@@ -295,13 +334,38 @@ app.post("/api/admin/topup-approve", requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// xoá user (kèm xoá đơn + topup)
+// admin duyệt thẻ cào: cộng netAmount
+app.post("/api/admin/card-approve", requireAdmin, (req, res) => {
+  const id = Number(req.body.id);
+  const approve = Boolean(req.body.approve);
+  const adminNote = normStr(req.body.adminNote);
+
+  const data = readData();
+  const card = data.cardTopups.find((c) => c.id === id);
+  if (!card) return res.status(404).json({ msg: "Không tìm thấy thẻ" });
+  if (card.status !== "Chờ duyệt") return res.status(400).json({ msg: "Thẻ đã xử lý rồi" });
+
+  card.adminNote = adminNote;
+
+  if (approve) {
+    card.status = "Đã duyệt";
+    const user = data.users.find((u) => u.username === card.username);
+    if (user) user.balance = Number(user.balance || 0) + Number(card.netAmount || 0);
+  } else {
+    card.status = "Từ chối";
+  }
+
+  writeData(data);
+  res.json({ ok: true });
+});
+
 app.post("/api/admin/user-delete", requireAdmin, (req, res) => {
   const username = normStr(req.body.username);
   const data = readData();
   data.users = data.users.filter((u) => u.username !== username);
   data.orders = data.orders.filter((o) => o.username !== username);
   data.topups = data.topups.filter((t) => t.username !== username);
+  data.cardTopups = data.cardTopups.filter((c) => c.username !== username);
   writeData(data);
   res.json({ ok: true });
 });
