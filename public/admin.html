@@ -1,80 +1,50 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin Login</title>
-  <link rel="stylesheet" href="/app.css" />
+  <title>Admin Login - Shop Gà Con</title>
+  <link rel="stylesheet" href="app.css" />
 </head>
-<body>
-  <div class="container">
-    <div class="nav">
-      <div class="brand">
-        <div class="logo"></div>
-        <h1>ADMIN</h1>
-      </div>
-      <div class="right">
-        <a class="pill" href="/">User</a>
+<body class="center">
+  <div class="card card-lg">
+    <div class="brand">
+      <div class="logo">AD</div>
+      <div>
+        <h2>Admin</h2>
+        <div class="muted">Đăng nhập để quản lý đơn & nạp</div>
       </div>
     </div>
 
-    <div class="card auth-card" style="margin-top:14px">
-      <div class="auth-head">
-        <div>
-          <h2 style="margin:0 0 6px">Đăng nhập Admin</h2>
-          <div class="muted">Chỉ admin biết tài khoản. Nếu bạn deploy trên Render, nên đặt ADMIN_USER/ADMIN_PASS để bảo mật.</div>
-        </div>
-        <a class="pill" href="https://www.facebook.com/share/1ajgzqUGdh/" target="_blank" rel="noopener">Hỗ trợ</a>
-      </div>
+    <label>Tài khoản admin</label>
+    <input id="a_user" placeholder="ADMIN_USER" />
 
-      <div class="row" style="align-items:flex-end">
-        <div style="flex:1; min-width:220px">
-          <label class="label">Admin user</label>
-          <input id="aUser" placeholder="Admin user" autocomplete="username" />
-        </div>
-        <div style="flex:1; min-width:220px">
-          <label class="label">Admin pass</label>
-          <div class="pass-wrap">
-            <input id="aPass" type="password" placeholder="Admin pass" autocomplete="current-password" />
-            <button class="icon-btn" id="toggleAdminPass" type="button" title="Hiện/ẩn mật khẩu">👁</button>
-          </div>
-        </div>
-        <button id="btnAdminLogin" class="btn-primary">Đăng nhập</button>
-      </div>
+    <label>Mật khẩu admin</label>
+    <input id="a_pass" type="password" placeholder="ADMIN_PASS" />
 
-      <div id="msg" class="note" style="display:none"></div>
+    <button class="btn" onclick="adminLogin()">Đăng nhập</button>
+    <div id="msg" class="msg"></div>
 
-      <div class="hr"></div>
-      <div class="muted" style="font-size:13px">
-        Gợi ý bảo mật: đổi ADMIN_PASS mạnh, không chia sẻ. Nếu quên, bạn có thể đổi trong Render → Environment → redeploy.
-      </div>
-    </div>
+    <div class="hint">Quay lại <a href="index.html">User login</a></div>
   </div>
 
 <script>
-function show(text){
-  msg.style.display = "block";
-  msg.innerText = text;
+async function adminLogin(){
+  msg.textContent = "";
+  try{
+    const r = await fetch("/api/admin/login",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ user: a_user.value, pass: a_pass.value })
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.msg || "Sai admin");
+    localStorage.setItem("adminToken", d.token);
+    location.href = "admin-dashboard.html";
+  }catch(e){
+    msg.textContent = e.message;
+  }
 }
-
-toggleAdminPass.onclick = () => { aPass.type = (aPass.type === 'password') ? 'text' : 'password'; };
-
-btnAdminLogin.onclick = async () => {
-  const adminUser = aUser.value.trim();
-  const adminPass = aPass.value.trim();
-
-  const r = await fetch("/api/admin/summary", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ adminUser, adminPass })
-  });
-  const d = await r.json();
-  if(!d.ok) return show("Sai admin");
-
-  localStorage.setItem("adminUser", adminUser);
-  localStorage.setItem("adminPass", adminPass);
-  location.href = "/admin-dashboard.html";
-};
 </script>
 </body>
 </html>
