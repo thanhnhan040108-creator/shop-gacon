@@ -1,383 +1,519 @@
-const express = require("express");
-const fs = require("fs");
+// server.js
+// Shop Gà Con - Node/Express backend
+// - Auth user (register/login), email recovery reset token
+// - Admin auth via ENV
+// - Orders + Topups (manual) + History
+// - Persist to data.json
+// - Serve Public/* static + HTML routes
+
 const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
+
+const express = require("express");
+const session = require("express-session");
 const bcrypt = require("bcryptjs");
 
 const app = express();
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
 
-const DB_PATH = path.join(__dirname, "data.json");
+// ====== CONFIG ======
+const PORT = process.env.PORT || 3000;
 
-// ===== Helpers =====
-function loadDB() {
-  if (!fs.existsSync(DB_PATH)) return { users: [], orders: [], topups: [] };
+// IMPORTANT: nếu file trên GitHub của bạn đang là "Data.json" thì đổi dòng này:
+const DATA_FILE = path.join(__dirname, "data.json"); // hoặc: "Data.json"
+
+const PUBLIC_DIR = path.join(__dirname, "Public");
+
+// Admin credentials (Render Environment Variables)
+const ADMIN_USER = process.env.ADMIN_USER || "admin";
+const ADMIN_PASS = process.env.ADMIN_PASS || "admin123"; // bắt buộc đổi khi deploy
+const SESSION_SECRET = process.env.SESSION_SECRET || "change_this_secret";
+
+// Bank info (hiển thị hướng dẫn chuyển khoản)
+const BANK_NAME = process.env.BANK_NAME || "MB Bank";
+const BANK_ACCOUNT_NAME = process.env.BANK_ACCOUNT_NAME || "VAN VIET THANH NHAN";
+const BANK_ACCOUNT_NUMBER = process.env.BANK_ACCOUNT_NUMBER || "7475040109";
+const BANK_QR_IMAGE = process.env.BANK_QR_IMAGE || "/mb-pr.jpg"; // đặt ảnh QR trong Public/
+
+// ====== MIDDLEWARE ======
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+app.use(
+  session({
+    name: "sg_session",
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false, // Render dùng https vẫn ok, nhưng nếu set true có thể lỗi khi test http local
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 ngày
+    },
+  })
+);
+
+// Serve static files
+app.use(express.static(PUBLIC_DIR, { extensions: ["html"] }));
+
+// ====== DATA LAYER ======
+const DEFAULT_DATA = {
+  users: [],
+  orders: [],
+  topups: [],
+  adminNotes: [], // optional log
+};
+
+// Simple write queue (tránh ghi đè file khi 2 request cùng lúc)
+let writing = Promise.resolve();
+
+function safeReadJson() {
   try {
-    return JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
-  } catch {
-    return { users: [], orders: [], topups: [] };
+    if (!fs.existsSync(DATA_FILE)) return { ...DEFAULT_DATA };
+    const raw = fs.readFileSync(DATA_FILE, "utf8").trim();
+    if (!raw) return { ...DEFAULT_DATA };
+    const parsed = JSON.parse(raw);
+
+    // ensure keys exist
+    return {
+      users: Array.isArray(parsed.users) ? parsed.users : [],
+      orders: Array.isArray(parsed.orders) ? parsed.orders : [],
+      topups: Array.isArray(parsed.topups) ? parsed.topups : [],
+      adminNotes: Array.isArray(parsed.adminNotes) ? parsed.adminNotes : [],
+    };
+  } catch (e) {
+    console.error("Read data.json error:", e);
+    return { ...DEFAULT_DATA };
   }
 }
-function saveDB(db) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
+
+function safeWriteJson(data) {
+  writing = writing.then(
+    () =>
+      new Promise((resolve, reject) => {
+        const tmp = DATA_FILE + ".tmp";
+        fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf8", (err) => {
+          if (err) return reject(err);
+          fs.rename(tmp, DATA_FILE, (err2) => {
+            if (err2) return reject(err2);
+            resolve();
+          });
+        });
+      })
+  );
+  return writing;
 }
+
 function nowISO() {
   return new Date().toISOString();
 }
-function genCode(prefix) {
-  return `${prefix}_${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-}
-function isAdmin(body) {
-  return (
-    body?.adminUser === process.env.ADMIN_USER &&
-    body?.adminPass === process.env.ADMIN_PASS
-  );
+function uid(prefix = "") {
+  return prefix + crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 }
 
-// ===== SERVICES (Báº£ng giĂ¡ báº¡n gá»­i) =====
-const SERVICES = [
-  // CĂ y Level, Beli, Fragment, Mastery
-  { id: "lv_1_700", category: "CĂ y Level / Beli / Frag / Mastery", name: "CĂ y Level 1-700", price: 10000, note: "" },
-  { id: "lv_700_1500", category: "CĂ y Level / Beli / Frag / Mastery", name: "CĂ y Level 700-1500", price: 10000, note: "" },
-  { id: "lv_1500_max", category: "CĂ y Level / Beli / Frag / Mastery", name: "CĂ y Level 1500-max", price: 20000, note: "" },
-  { id: "lv_1_max_godhuman", category: "CĂ y Level / Beli / Frag / Mastery", name: "CĂ y Level 1-max", price: 50000, note: "cáº£ láº¥y godhuman" },
-  { id: "beli_9m", category: "CĂ y Level / Beli / Frag / Mastery", name: "9m beli", price: 10000, note: "" },
-  { id: "frag_20k", category: "CĂ y Level / Beli / Frag / Mastery", name: "20k frag", price: 10000, note: "" },
-  { id: "mas_1_600_melee_sword_fruit_m1", category: "CĂ y Level / Beli / Frag / Mastery", name: "1-600 mas", price: 10000, note: "(mele + kiáº¿m + trĂ¡i cĂ³ m1)" },
-  { id: "mas_1_600_gun_fruit_no_m1", category: "CĂ y Level / Beli / Frag / Mastery", name: "1-600 mas", price: 20000, note: "(sĂºng + trĂ¡i ko cĂ³ m1)" },
+// ====== AUTH HELPERS ======
+function requireUser(req, res, next) {
+  if (!req.session.userId) return res.status(401).json({ error: "NOT_LOGGED_IN" });
+  next();
+}
 
-  // Láº¥y Melle/Items
-  { id: "get_deathstep", category: "Láº¥y Melee / Items", name: "Láº¥y Death step", price: 10000, note: "10k/1 vĂµ" },
-  { id: "get_sharkman", category: "Láº¥y Melee / Items", name: "Láº¥y Sharkman karate", price: 10000, note: "10k/1 vĂµ" },
-  { id: "get_electric_claw", category: "Láº¥y Melee / Items", name: "Láº¥y Electric claw", price: 10000, note: "10k/1 vĂµ" },
-  { id: "get_dragon_talon", category: "Láº¥y Melee / Items", name: "Láº¥y Dragon talon", price: 10000, note: "10k/1 vĂµ" },
+function requireAdmin(req, res, next) {
+  if (!req.session.isAdmin) return res.status(401).json({ error: "ADMIN_ONLY" });
+  next();
+}
 
-  { id: "get_godhuman_fullskill_need_mats", category: "Láº¥y Melee / Items", name: "Láº¥y Godhuman + cĂ y full skill", price: 40000, note: "ChÆ°a Ä‘á»§ nguyĂªn liá»‡u" },
-  { id: "get_godhuman_fullskill_have_mats", category: "Láº¥y Melee / Items", name: "Láº¥y Godhuman + cĂ y full skill", price: 20000, note: "Äá»§ nguyĂªn liá»‡u" },
+function publicUser(u) {
+  return { id: u.id, username: u.username, email: u.email, createdAt: u.createdAt };
+}
 
-  { id: "get_sanguine_art", category: "Láº¥y Melee / Items", name: "Láº¥y Sanguine art", price: 10000, note: "ÄĂ£ kĂ©o tim vá» tiki" },
-  { id: "get_cdk", category: "Láº¥y Melee / Items", name: "Láº¥y Curse dual katana", price: 20000, note: "" },
+// ====== ROUTES (HTML shortcuts) ======
+app.get("/", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "index.html")));
+app.get("/home", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "home.html")));
+app.get("/admin", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "admin.html")));
+app.get("/admin-dashboard", (req, res) =>
+  res.sendFile(path.join(PUBLIC_DIR, "admin-dashboard.html"))
+);
+// Nếu bạn có payment.html trong Public, route này sẽ tự serve, vẫn thêm cho chắc:
+app.get("/payment", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "payment.html")));
 
-  { id: "get_shisui", category: "Láº¥y Melee / Items", name: "Láº¥y Shisui", price: 7000, note: "7k/1 cĂ¢y (cáº£ cĂ y mas)" },
-  { id: "get_saddi", category: "Láº¥y Melee / Items", name: "Láº¥y Saddi", price: 7000, note: "7k/1 cĂ¢y (cáº£ cĂ y mas)" },
-  { id: "get_wando", category: "Láº¥y Melee / Items", name: "Láº¥y Wando", price: 7000, note: "7k/1 cĂ¢y (cáº£ cĂ y mas)" },
+// ====== USER API ======
 
-  { id: "get_ttk", category: "Láº¥y Melee / Items", name: "Láº¥y True Triple Katana", price: 5000, note: "(ÄĂ£ cĂ³ 3 kiáº¿m, chá»‰ cáº§n cĂ y mas)" },
-  { id: "get_fox_lamp", category: "Láº¥y Melee / Items", name: "Láº¥y Fox lamp", price: 40000, note: "" },
-  { id: "get_tushita", category: "Láº¥y Melee / Items", name: "Láº¥y Tushita", price: 10000, note: "" },
-  { id: "get_yama", category: "Láº¥y Melee / Items", name: "Láº¥y Yama", price: 10000, note: "" },
-  { id: "get_shark_anchor", category: "Láº¥y Melee / Items", name: "Láº¥y Shark Anchor", price: 20000, note: "" },
-  { id: "get_soul_guitar", category: "Láº¥y Melee / Items", name: "Láº¥y Soul guitar", price: 10000, note: "" },
-  { id: "get_dark_fragment", category: "Láº¥y Melee / Items", name: "Láº¥y Dark Fragment", price: 7000, note: "" },
-  { id: "upgrade_star", category: "Láº¥y Melee / Items", name: "NĂ¢ng sao cho kiáº¿m/sĂºng", price: 2000, note: "2k/1" },
-  { id: "get_haki_legendary", category: "Láº¥y Melee / Items", name: "Láº¥y Haki legendary", price: 20000, note: "20k/3 mĂ u" },
-  { id: "materials_quote", category: "Láº¥y Melee / Items", name: "Tuá»³ tá»«ng nguyĂªn liá»‡u", price: 0, note: "IB mĂ¬nh bĂ¡o giĂ¡" },
+// Register
+app.post("/api/register", async (req, res) => {
+  try {
+    const { username, password, email } = req.body || {};
+    if (!username || !password || !email) {
+      return res.status(400).json({ error: "MISSING_FIELDS" });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
+    }
 
-  // Up tá»™c v4
-  { id: "race_cyborg", category: "Up tá»™c v4", name: "Láº¥y tá»™c Cyborg", price: 20000, note: "" },
-  { id: "race_ghoul", category: "Up tá»™c v4", name: "Láº¥y tá»™c Ghoul", price: 10000, note: "" },
-  { id: "race_v1_v3", category: "Up tá»™c v4", name: "Up tá»™c v1-v3", price: 10000, note: "" },
-  { id: "pull_lever_have_mirror_rip", category: "Up tá»™c v4", name: "Gáº¡t cáº§n", price: 5000, note: "(CĂ³ máº£nh gÆ°Æ¡ng, Ä‘Ă¡nh rip)" },
-  { id: "pull_lever_no_rip_doughking", category: "Up tá»™c v4", name: "Gáº¡t cáº§n", price: 20000, note: "(ChÆ°a Ä‘Ă¡nh rip, dough king)" },
-  { id: "v4_1_gear", category: "Up tá»™c v4", name: "Up v4 1 gear", price: 7000, note: "" },
-  { id: "v4_full_gear", category: "Up tá»™c v4", name: "UP v4 full gear", price: 40000, note: "(Bao frag, cáº£ gear Ä‘á»•i)" },
+    const db = safeReadJson();
+    const uName = String(username).trim().toLowerCase();
+    const uEmail = String(email).trim().toLowerCase();
 
-  // Leviathan
-  { id: "leviathan_break_idk", category: "Leviathan", name: "PhĂ¡ IDK", price: 10000, note: "" },
-  { id: "leviathan_heart_tiki", category: "Leviathan", name: "KĂ©o tim vá» Tiki", price: 30000, note: "" },
-  { id: "leviathan_heart_hydra", category: "Leviathan", name: "KĂ©o tim vá» Hydra", price: 40000, note: "" },
+    if (db.users.some((u) => u.username.toLowerCase() === uName)) {
+      return res.status(409).json({ error: "USERNAME_EXISTS" });
+    }
+    if (db.users.some((u) => u.email.toLowerCase() === uEmail)) {
+      return res.status(409).json({ error: "EMAIL_EXISTS" });
+    }
 
-  // Draco Update
-  { id: "draco_full_belt", category: "Draco Update", name: "Láº¥y full Ä‘ai", price: 20000, note: "" },
-  { id: "draco_race_v1", category: "Draco Update", name: "Láº¥y tá»™c Draco v1", price: 7000, note: "" },
-  { id: "draco_v1_v3", category: "Draco Update", name: "Up Draco v1-v3", price: 10000, note: "(yĂªu cáº§u trĂªn 3.5m beli)" },
-  { id: "draco_heart", category: "Draco Update", name: "Láº¥y Dragon Heart", price: 7000, note: "" },
-  { id: "draco_storm", category: "Draco Update", name: "Láº¥y Dragon Storm", price: 15000, note: "" },
-  { id: "draco_egg", category: "Draco Update", name: "Láº¥y 1 trá»©ng", price: 7000, note: "" },
-  { id: "draco_gear_1", category: "Draco Update", name: "Up gear Draco", price: 7000, note: "1 gear (Ä‘Ă£ train)" },
-  { id: "draco_gear_full", category: "Draco Update", name: "Up gear Draco full", price: 35000, note: "full gear (bao f)" },
-  { id: "draco_combo_az", category: "Draco Update", name: "Full combo A-Z", price: 150000, note: "" },
+    const hash = await bcrypt.hash(String(password), 10);
+    const user = {
+      id: uid("u_"),
+      username: String(username).trim(),
+      email: uEmail,
+      passwordHash: hash,
+      createdAt: nowISO(),
+      balance: 0,
+      resetToken: null,
+      resetTokenExp: null,
+    };
 
-  // Bounty Hunt
-  { id: "bounty_pirate_1m", category: "Bounty Hunt", name: "1m Bounty háº£i táº·c", price: 10000, note: "" },
-  { id: "bounty_marine_1m", category: "Bounty Hunt", name: "1m Bounty háº£i quĂ¢n", price: 15000, note: "" }
-];
+    db.users.push(user);
+    await safeWriteJson(db);
 
-// ===== USER AUTH =====
-app.post("/api/auth/register", (req, res) => {
-  const { username, password, gmail } = req.body || {};
-  if (!username || !password || !gmail) {
-    return res.status(400).json({ ok: false, msg: "Thiáº¿u username/password/gmail" });
+    req.session.userId = user.id;
+    req.session.isAdmin = false;
+
+    return res.json({ ok: true, user: publicUser(user) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "SERVER_ERROR" });
   }
-  if (String(password).length < 6) {
-    return res.status(400).json({ ok: false, msg: "Máº­t kháº©u >= 6 kĂ½ tá»±" });
-  }
-
-  const db = loadDB();
-  const uName = String(username).trim();
-
-  if (db.users.find(u => u.username === uName)) {
-    return res.status(409).json({ ok: false, msg: "TĂ i khoáº£n Ä‘Ă£ tá»“n táº¡i" });
-  }
-
-  const passHash = bcrypt.hashSync(String(password), 10);
-  db.users.push({
-    username: uName,
-    passHash,
-    gmail: String(gmail).trim(),
-    balance: 0,
-    createdAt: nowISO()
-  });
-
-  saveDB(db);
-  res.json({ ok: true });
 });
 
-app.post("/api/auth/login", (req, res) => {
+// Login
+app.post("/api/login", async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    if (!username || !password) return res.status(400).json({ error: "MISSING_FIELDS" });
+
+    const db = safeReadJson();
+    const user = db.users.find((u) => u.username.toLowerCase() === String(username).trim().toLowerCase());
+    if (!user) return res.status(401).json({ error: "INVALID_LOGIN" });
+
+    const ok = await bcrypt.compare(String(password), user.passwordHash);
+    if (!ok) return res.status(401).json({ error: "INVALID_LOGIN" });
+
+    req.session.userId = user.id;
+    req.session.isAdmin = false;
+
+    res.json({ ok: true, user: publicUser(user) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
+});
+
+// Me
+app.get("/api/me", (req, res) => {
+  const db = safeReadJson();
+  if (req.session.isAdmin) {
+    return res.json({ role: "admin", username: ADMIN_USER });
+  }
+  if (!req.session.userId) return res.status(401).json({ error: "NOT_LOGGED_IN" });
+  const user = db.users.find((u) => u.id === req.session.userId);
+  if (!user) return res.status(401).json({ error: "NOT_LOGGED_IN" });
+  res.json({ role: "user", ...publicUser(user), balance: user.balance || 0 });
+});
+
+// Logout
+app.post("/api/logout", (req, res) => {
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
+// Request password reset (by email)
+app.post("/api/request-reset", async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ error: "MISSING_EMAIL" });
+
+    const db = safeReadJson();
+    const uEmail = String(email).trim().toLowerCase();
+    const user = db.users.find((u) => u.email.toLowerCase() === uEmail);
+
+    // Không leak email có tồn tại hay không: vẫn trả ok
+    if (!user) return res.json({ ok: true });
+
+    const token = crypto.randomBytes(3).toString("hex").toUpperCase(); // 6 ký tự
+    user.resetToken = token;
+    user.resetTokenExp = Date.now() + 1000 * 60 * 15; // 15 phút
+
+    await safeWriteJson(db);
+
+    // Vì bạn chưa có gửi email thật, trả token để test (sau này bạn có thể bỏ)
+    res.json({ ok: true, token });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
+});
+
+// Reset password using token
+app.post("/api/reset-password", async (req, res) => {
+  try {
+    const { email, token, newPassword } = req.body || {};
+    if (!email || !token || !newPassword) return res.status(400).json({ error: "MISSING_FIELDS" });
+    if (String(newPassword).length < 6) return res.status(400).json({ error: "PASSWORD_TOO_SHORT" });
+
+    const db = safeReadJson();
+    const user = db.users.find((u) => u.email.toLowerCase() === String(email).trim().toLowerCase());
+    if (!user) return res.status(400).json({ error: "INVALID_TOKEN" });
+
+    if (!user.resetToken || !user.resetTokenExp) return res.status(400).json({ error: "INVALID_TOKEN" });
+    if (Date.now() > user.resetTokenExp) return res.status(400).json({ error: "TOKEN_EXPIRED" });
+    if (String(token).trim().toUpperCase() !== String(user.resetToken).toUpperCase()) {
+      return res.status(400).json({ error: "INVALID_TOKEN" });
+    }
+
+    user.passwordHash = await bcrypt.hash(String(newPassword), 10);
+    user.resetToken = null;
+    user.resetTokenExp = null;
+
+    await safeWriteJson(db);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
+});
+
+// ====== ADMIN API ======
+
+// Admin login
+app.post("/api/admin/login", (req, res) => {
   const { username, password } = req.body || {};
-  const db = loadDB();
-  const u = db.users.find(x => x.username === String(username || "").trim());
-  if (!u) return res.status(401).json({ ok: false, msg: "Sai tĂ i khoáº£n hoáº·c máº­t kháº©u" });
+  if (!username || !password) return res.status(400).json({ error: "MISSING_FIELDS" });
 
-  const ok = bcrypt.compareSync(String(password || ""), u.passHash);
-  if (!ok) return res.status(401).json({ ok: false, msg: "Sai tĂ i khoáº£n hoáº·c máº­t kháº©u" });
-
-  res.json({
-    ok: true,
-    user: { username: u.username, gmail: u.gmail, balance: Number(u.balance || 0) }
-  });
-});
-
-app.post("/api/auth/reset-password", async (req, res) => {
-  const { username, gmail, newPassword } = req.body || {};
-  const uName = String(username || "").trim();
-  const mail = String(gmail || "").trim();
-
-  if (!uName || !mail || !newPassword) {
-    return res.status(400).json({ ok: false, msg: "Thiáº¿u username/gmail/máº­t kháº©u má»›i" });
+  if (String(username) === ADMIN_USER && String(password) === ADMIN_PASS) {
+    req.session.isAdmin = true;
+    req.session.userId = null;
+    return res.json({ ok: true, role: "admin", username: ADMIN_USER });
   }
-  if (String(newPassword).length < 6) {
-    return res.status(400).json({ ok: false, msg: "Máº­t kháº©u má»›i >= 6 kĂ½ tá»±" });
+  return res.status(401).json({ error: "INVALID_LOGIN" });
+});
+
+app.get("/api/admin/me", (req, res) => {
+  if (!req.session.isAdmin) return res.status(401).json({ error: "ADMIN_ONLY" });
+  res.json({ ok: true, username: ADMIN_USER });
+});
+
+// ====== ORDERS ======
+app.post("/api/orders", requireUser, async (req, res) => {
+  try {
+    const { service, amount, note } = req.body || {};
+    if (!service || !amount) return res.status(400).json({ error: "MISSING_FIELDS" });
+
+    const db = safeReadJson();
+    const user = db.users.find((u) => u.id === req.session.userId);
+    if (!user) return res.status(401).json({ error: "NOT_LOGGED_IN" });
+
+    const order = {
+      id: uid("od_"),
+      userId: user.id,
+      username: user.username,
+      service: String(service),
+      amount: Number(amount),
+      note: String(note || "").slice(0, 500),
+      status: "Chờ xử lý",
+      adminNote: "",
+      createdAt: nowISO(),
+      updatedAt: nowISO(),
+    };
+
+    db.orders.unshift(order);
+    await safeWriteJson(db);
+
+    res.json({ ok: true, id: order.id, order });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "SERVER_ERROR" });
   }
+});
 
-  const db = loadDB();
-  const u = db.users.find(x => x.username === uName);
-  if (!u) return res.status(404).json({ ok: false, msg: "TĂ i khoáº£n khĂ´ng tá»“n táº¡i" });
+app.get("/api/orders/me", requireUser, (req, res) => {
+  const db = safeReadJson();
+  const items = db.orders.filter((o) => o.userId === req.session.userId);
+  res.json({ ok: true, orders: items });
+});
 
-  if (String(u.gmail || "").trim().toLowerCase() !== mail.toLowerCase()) {
-    return res.status(401).json({ ok: false, msg: "Gmail khĂ´ng khá»›p" });
+// Admin: list orders
+app.get("/api/admin/orders", requireAdmin, (req, res) => {
+  const db = safeReadJson();
+  res.json({ ok: true, orders: db.orders });
+});
+
+// Admin: update order status/adminNote
+app.post("/api/admin/orders/:id", requireAdmin, async (req, res) => {
+  try {
+    const { status, adminNote } = req.body || {};
+    const db = safeReadJson();
+    const o = db.orders.find((x) => x.id === req.params.id);
+    if (!o) return res.status(404).json({ error: "NOT_FOUND" });
+
+    if (status) o.status = String(status);
+    if (adminNote !== undefined) o.adminNote = String(adminNote).slice(0, 500);
+    o.updatedAt = nowISO();
+
+    await safeWriteJson(db);
+    res.json({ ok: true, order: o });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "SERVER_ERROR" });
   }
-
-  const passHash = await bcrypt.hash(String(newPassword), 10);
-  u.passHash = passHash;
-  u.passUpdatedAt = nowISO();
-
-  saveDB(db);
-  res.json({ ok: true, msg: "Äá»•i máº­t kháº©u thĂ nh cĂ´ng" });
 });
 
+// ====== TOPUPS (manual) ======
+app.post("/api/topups", requireUser, async (req, res) => {
+  try {
+    const { method, amount } = req.body || {};
+    if (!method || !amount) return res.status(400).json({ error: "MISSING_FIELDS" });
 
-app.get("/api/balance", (req, res) => {
-  const { username } = req.query;
-  const db = loadDB();
-  const u = db.users.find(x => x.username === String(username || "").trim());
-  res.json({ ok: true, balance: u ? Number(u.balance || 0) : 0 });
-});
+    const db = safeReadJson();
+    const user = db.users.find((u) => u.id === req.session.userId);
+    if (!user) return res.status(401).json({ error: "NOT_LOGGED_IN" });
 
-// ===== SERVICES =====
-app.get("/api/services", (req, res) => {
-  res.json({ ok: true, services: SERVICES });
-});
+    const code = "NAP_" + crypto.randomBytes(3).toString("hex").toUpperCase(); // NAP_XXXXXX
 
-// ===== ORDERS: táº¡o Ä‘Æ¡n + ghi chĂº + tráº¡ng thĂ¡i =====
-app.post("/api/orders", (req, res) => {
-  const { username, serviceId, note } = req.body || {};
-  const db = loadDB();
+    const topup = {
+      id: uid("tp_"),
+      userId: user.id,
+      username: user.username,
+      method: String(method),
+      amount: Number(amount),
+      code,
+      status: "Chờ duyệt",
+      adminNote: "",
+      createdAt: nowISO(),
+      updatedAt: nowISO(),
+    };
 
-  const u = db.users.find(x => x.username === String(username || "").trim());
-  if (!u) return res.status(404).json({ ok: false, msg: "KhĂ´ng tĂ¬m tháº¥y user" });
+    db.topups.unshift(topup);
+    await safeWriteJson(db);
 
-  const s = SERVICES.find(x => x.id === serviceId);
-  if (!s) return res.status(404).json({ ok: false, msg: "KhĂ´ng tĂ¬m tháº¥y dá»‹ch vá»¥" });
-
-  if (Number(s.price) <= 0) {
-    return res.status(400).json({ ok: false, msg: "Dá»‹ch vá»¥ nĂ y lĂ  IB bĂ¡o giĂ¡, khĂ´ng thá»ƒ mua trá»±c tiáº¿p." });
+    res.json({
+      ok: true,
+      id: topup.id,
+      topup,
+      bank: {
+        name: BANK_NAME,
+        accountName: BANK_ACCOUNT_NAME,
+        accountNumber: BANK_ACCOUNT_NUMBER,
+        qrImage: BANK_QR_IMAGE,
+        transferContent: code,
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "SERVER_ERROR" });
   }
-
-  const bal = Number(u.balance || 0);
-  if (bal < s.price) return res.status(400).json({ ok: false, msg: "Sá»‘ dÆ° khĂ´ng Ä‘á»§" });
-
-  u.balance = bal - s.price;
-
-  const order = {
-    id: Date.now().toString(),
-    username: u.username,
-    serviceId: s.id,
-    category: s.category,
-    serviceName: s.name,
-    note: String(note || "").trim(),
-    amount: Number(s.price),
-    status: "PAID",         // máº·c Ä‘á»‹nh khi user mua xong
-    createdAt: nowISO(),
-    updatedAt: null
-  };
-
-  db.orders.unshift(order);
-  saveDB(db);
-
-  res.json({ ok: true, order, balance: u.balance });
 });
 
-app.get("/api/orders", (req, res) => {
-  const { username } = req.query;
-  const db = loadDB();
-  const list = String(username || "").trim()
-    ? db.orders.filter(o => o.username === String(username).trim())
-    : db.orders;
-  res.json({ ok: true, orders: list });
+// User: list topups
+app.get("/api/topups/me", requireUser, (req, res) => {
+  const db = safeReadJson();
+  const items = db.topups.filter((t) => t.userId === req.session.userId);
+  res.json({ ok: true, topups: items });
 });
 
-// ===== TOPUP (MB manual approve) =====
-app.post("/api/topups", (req, res) => {
-  const { username, amount } = req.body || {};
-  const amt = Number(amount);
+// Admin: list topups
+app.get("/api/admin/topups", requireAdmin, (req, res) => {
+  const db = safeReadJson();
+  res.json({ ok: true, topups: db.topups });
+});
 
-  if (!username || !Number.isFinite(amt) || amt < 1000) {
-    return res.status(400).json({ ok: false, msg: "Thiáº¿u username hoáº·c sá»‘ tiá»n khĂ´ng há»£p lá»‡" });
+// Admin: approve/reject topup + optionally credit balance
+app.post("/api/admin/topups/:id", requireAdmin, async (req, res) => {
+  try {
+    const { status, adminNote, creditBalance } = req.body || {};
+    const db = safeReadJson();
+    const t = db.topups.find((x) => x.id === req.params.id);
+    if (!t) return res.status(404).json({ error: "NOT_FOUND" });
+
+    if (status) t.status = String(status);
+    if (adminNote !== undefined) t.adminNote = String(adminNote).slice(0, 500);
+    t.updatedAt = nowISO();
+
+    // Nếu admin set creditBalance=true và status=Đã duyệt -> cộng tiền
+    if (creditBalance === true && String(t.status).toLowerCase().includes("duyệt")) {
+      const u = db.users.find((x) => x.id === t.userId);
+      if (u) {
+        u.balance = Number(u.balance || 0) + Number(t.amount || 0);
+      }
+    }
+
+    await safeWriteJson(db);
+    res.json({ ok: true, topup: t });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "SERVER_ERROR" });
   }
-
-  const db = loadDB();
-  const u = db.users.find(x => x.username === String(username).trim());
-  if (!u) return res.status(404).json({ ok: false, msg: "User khĂ´ng tá»“n táº¡i" });
-
-  const code = genCode("NAP");
-  const topup = {
-    id: Date.now().toString(),
-    username: u.username,
-    amount: amt,
-    code,
-    status: "PENDING",
-    createdAt: nowISO(),
-    approvedAt: null
-  };
-
-  db.topups.unshift(topup);
-  saveDB(db);
-  res.json({ ok: true, topup });
 });
 
-app.get("/api/topups", (req, res) => {
-  const { username } = req.query;
-  const db = loadDB();
-  const list = String(username || "").trim()
-    ? db.topups.filter(t => t.username === String(username).trim())
-    : db.topups;
-  res.json({ ok: true, topups: list });
+// ====== HISTORY (combined) ======
+app.get("/api/history", requireUser, (req, res) => {
+  const db = safeReadJson();
+  const orders = db.orders.filter((o) => o.userId === req.session.userId);
+  const topups = db.topups.filter((t) => t.userId === req.session.userId);
+  res.json({ ok: true, orders, topups });
 });
 
-// ===== ADMIN =====
-app.post("/api/admin/summary", (req, res) => {
-  if (!isAdmin(req.body)) return res.status(401).json({ ok: false, msg: "Sai admin" });
-  const db = loadDB();
-  res.json({ ok: true, users: db.users, topups: db.topups, orders: db.orders });
-});
+// ====== PAYMENT INFO (for payment.html) ======
+app.get("/api/payment-info", requireUser, (req, res) => {
+  // query: ?type=order&id=...
+  const { type, id } = req.query || {};
+  const db = safeReadJson();
+  const user = db.users.find((u) => u.id === req.session.userId);
+  if (!user) return res.status(401).json({ error: "NOT_LOGGED_IN" });
 
-app.post("/api/admin/topups/approve", (req, res) => {
-  if (!isAdmin(req.body)) return res.status(401).json({ ok: false, msg: "Sai admin" });
-
-  const { topupId } = req.body || {};
-  const db = loadDB();
-
-  const t = db.topups.find(x => x.id === topupId);
-  if (!t) return res.status(404).json({ ok: false, msg: "KhĂ´ng tháº¥y topup" });
-  if (t.status === "APPROVED") return res.json({ ok: true });
-
-  const u = db.users.find(x => x.username === t.username);
-  if (!u) return res.status(404).json({ ok: false, msg: "User khĂ´ng tá»“n táº¡i" });
-
-  u.balance = Number(u.balance || 0) + Number(t.amount);
-  t.status = "APPROVED";
-  t.approvedAt = nowISO();
-
-  saveDB(db);
-  res.json({ ok: true });
-});
-
-app.post("/api/admin/topups/reject", (req, res) => {
-  if (!isAdmin(req.body)) return res.status(401).json({ ok: false, msg: "Sai admin" });
-
-  const { topupId } = req.body || {};
-  const db = loadDB();
-
-  const t = db.topups.find(x => x.id === topupId);
-  if (!t) return res.status(404).json({ ok: false, msg: "KhĂ´ng tháº¥y topup" });
-  if (t.status !== "PENDING") return res.status(400).json({ ok: false, msg: "Topup Ä‘Ă£ xá»­ lĂ½" });
-
-  t.status = "REJECTED";
-  t.approvedAt = nowISO();
-
-  saveDB(db);
-  res.json({ ok: true });
-});
-
-// Admin: Ä‘á»•i tráº¡ng thĂ¡i Ä‘Æ¡n
-app.post("/api/admin/orders/set-status", (req, res) => {
-  if (!isAdmin(req.body)) return res.status(401).json({ ok: false, msg: "Sai admin" });
-
-  const { orderId, status } = req.body || {};
-  const allow = ["PAID", "DOING", "DONE"];
-  if (!allow.includes(status)) {
-    return res.status(400).json({ ok: false, msg: "Status khĂ´ng há»£p lá»‡" });
-  }
-
-  const db = loadDB();
-  const o = db.orders.find(x => x.id === orderId);
-  if (!o) return res.status(404).json({ ok: false, msg: "KhĂ´ng tĂ¬m tháº¥y order" });
-
-  o.status = status;
-  o.updatedAt = nowISO();
-
-  saveDB(db);
-  res.json({ ok: true });
-});
-
-// Admin: xoĂ¡ user + xoĂ¡ lá»‹ch sá»­ liĂªn quan
-app.post("/api/admin/delete-user", (req, res) => {
-  if (!isAdmin(req.body)) return res.status(401).json({ ok: false, msg: "Sai admin" });
-
-  const user = String(req.body?.username || "").trim();
-  if (!user) return res.status(400).json({ ok: false, msg: "Thiáº¿u username" });
-
-  const db = loadDB();
-  const before = db.users.length;
-
-  db.users = db.users.filter(u => u.username !== user);
-  db.orders = db.orders.filter(o => o.username !== user);
-  db.topups = db.topups.filter(t => t.username !== user);
-
-  saveDB(db);
-  res.json({ ok: true, removed: before - db.users.length });
-});
-
-// Admin: set balance
-app.post("/api/admin/set-balance", (req, res) => {
-  if (!isAdmin(req.body)) return res.status(401).json({ ok: false, msg: "Sai admin" });
-
-  const user = String(req.body?.username || "").trim();
-  const b = Number(req.body?.balance);
-
-  if (!user || !Number.isFinite(b) || b < 0) {
-    return res.status(400).json({ ok: false, msg: "Dá»¯ liá»‡u khĂ´ng há»£p lá»‡" });
+  if (type === "order") {
+    const o = db.orders.find((x) => x.id === id && x.userId === user.id);
+    if (!o) return res.status(404).json({ error: "NOT_FOUND" });
+    return res.json({
+      ok: true,
+      type: "order",
+      item: o,
+      bank: {
+        name: BANK_NAME,
+        accountName: BANK_ACCOUNT_NAME,
+        accountNumber: BANK_ACCOUNT_NUMBER,
+        qrImage: BANK_QR_IMAGE,
+        transferContent: `DON_${o.id}`.slice(0, 30),
+      },
+      note: "Đây là thanh toán thủ công. Chuyển khoản đúng nội dung, admin sẽ xác nhận.",
+    });
   }
 
-  const db = loadDB();
-  const u = db.users.find(x => x.username === user);
-  if (!u) return res.status(404).json({ ok: false, msg: "User khĂ´ng tá»“n táº¡i" });
+  if (type === "topup") {
+    const t = db.topups.find((x) => x.id === id && x.userId === user.id);
+    if (!t) return res.status(404).json({ error: "NOT_FOUND" });
+    return res.json({
+      ok: true,
+      type: "topup",
+      item: t,
+      bank: {
+        name: BANK_NAME,
+        accountName: BANK_ACCOUNT_NAME,
+        accountNumber: BANK_ACCOUNT_NUMBER,
+        qrImage: BANK_QR_IMAGE,
+        transferContent: t.code,
+      },
+      note: "Chuyển khoản đúng nội dung (mã nạp). Admin sẽ duyệt và cộng tiền.",
+    });
+  }
 
-  u.balance = b;
-  saveDB(db);
-  res.json({ ok: true });
+  res.status(400).json({ error: "INVALID_TYPE" });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on", PORT));
+// ====== HEALTH ======
+app.get("/api/health", (req, res) => res.json({ ok: true, time: nowISO() }));
+
+// ====== START ======
+app.listen(PORT, () => {
+  console.log("Shop Gà Con server listening on port", PORT);
+  console.log("Public dir:", PUBLIC_DIR);
+});
