@@ -274,3 +274,28 @@
   </script>
 </body>
   </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Thanh toán</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="center">
+  <div class="card">
+    <h3>Quét QR MB Bank</h3>
+    <img src="mb-qr.jpg" width="200" />
+    <p>Nội dung chuyển khoản:</p>
+    <b id="code"></b>
+    <p>Chuyển đúng nội dung để admin duyệt</p>
+    <button onclick="back()">Quay lại</button>
+  </div>
+
+<script>
+code.innerText = localStorage.getItem("payCode");
+function back() {
+  location.href = "home.html";
+}
+</script>
+</body>
+</html>
