@@ -517,3 +517,129 @@ app.listen(PORT, () => {
   console.log("Shop Gà Con server listening on port", PORT);
   console.log("Public dir:", PUBLIC_DIR);
 });
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(express.static("public"));
+
+const DATA_FILE = "./data.json";
+
+function readData() {
+  if (!fs.existsSync(DATA_FILE)) {
+    fs.writeFileSync(
+      DATA_FILE,
+      JSON.stringify({ users: [], orders: [], topups: [] }, null, 2)
+    );
+  }
+  return JSON.parse(fs.readFileSync(DATA_FILE));
+}
+
+function writeData(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
+
+/* ===== AUTH ===== */
+app.post("/api/login", (req, res) => {
+  const { username, password } = req.body;
+  const data = readData();
+  const user = data.users.find(
+    (u) => u.username === username && u.password === password
+  );
+  if (!user) return res.status(401).json({ msg: "Sai tài khoản hoặc mật khẩu" });
+  res.json({ user });
+});
+
+app.post("/api/register", (req, res) => {
+  const { username, password, email } = req.body;
+  const data = readData();
+  if (data.users.find((u) => u.username === username)) {
+    return res.status(400).json({ msg: "Tài khoản đã tồn tại" });
+  }
+  data.users.push({
+    username,
+    password,
+    email,
+    balance: 0,
+  });
+  writeData(data);
+  res.json({ msg: "Đăng ký thành công" });
+});
+
+/* ===== ORDER ===== */
+app.post("/api/order", (req, res) => {
+  const { username, service, price, note } = req.body;
+  const data = readData();
+
+  const order = {
+    id: Date.now(),
+    username,
+    service,
+    price,
+    note,
+    status: "Chờ xử lý",
+    time: new Date().toLocaleString(),
+  };
+
+  data.orders.push(order);
+  writeData(data);
+  res.json(order);
+});
+
+app.get("/api/orders/:username", (req, res) => {
+  const data = readData();
+  res.json(data.orders.filter(o => o.username === req.params.username));
+});
+
+/* ===== TOPUP ===== */
+app.post("/api/topup", (req, res) => {
+  const { username, amount } = req.body;
+  const data = readData();
+
+  const code = "NAP_" + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  data.topups.push({
+    id: Date.now(),
+    username,
+    amount,
+    code,
+    status: "Chờ duyệt",
+    time: new Date().toLocaleString(),
+  });
+
+  writeData(data);
+  res.json({ code });
+});
+
+/* ===== ADMIN ===== */
+app.post("/api/admin/login", (req, res) => {
+  const { user, pass } = req.body;
+  if (
+    user === process.env.ADMIN_USER &&
+    pass === process.env.ADMIN_PASS
+  ) {
+    return res.json({ ok: true });
+  }
+  res.status(401).json({ msg: "Sai admin" });
+});
+
+app.get("/api/admin/data", (req, res) => {
+  res.json(readData());
+});
+
+app.post("/api/admin/order-status", (req, res) => {
+  const { id, status } = req.body;
+  const data = readData();
+  const order = data.orders.find(o => o.id === id);
+  if (order) order.status = status;
+  writeData(data);
+  res.json({ ok: true });
+});
+
+app.listen(PORT, () =>
+  console.log("Server running on port " + PORT)
+);
