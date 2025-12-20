@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cổng thanh toán • Shop Gà Con</title>
+  <link rel="stylesheet" href="/app.css" />
+  <style>
+    .pay-grid{display:grid;gap:14px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .badge{padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);font-weight:700}
+    .muted{opacity:.85}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .qr-box{display:grid;place-items:center;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:12px;background:rgba(255,255,255,.03)}
+    .qr-box img{max-width:320px;width:100%;height:auto;border-radius:12px}
+    .kvs{display:grid;gap:8px}
+    .kv{display:flex;justify-content:space-between;gap:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);padding:10px 12px;border-radius:14px}
+    .kv b{white-space:nowrap}
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn-secondary{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10)}
+    .btn-danger{background:rgba(255,80,80,.15);border:1px solid rgba(255,80,80,.35)}
+    .warn{border:1px solid rgba(255,190,0,.35);background:rgba(255,190,0,.08);padding:10px 12px;border-radius:14px}
+    .ok{border:1px solid rgba(0,200,120,.35);background:rgba(0,200,120,.08);padding:10px 12px;border-radius:14px}
+    .err{border:1px solid rgba(255,80,80,.35);background:rgba(255,80,80,.10);padding:10px 12px;border-radius:14px}
+  </style>
+</head>
+<body class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">SG</div>
+      <div>
+        <div class="title">Shop Gà Con</div>
+        <div class="sub muted">Cổng thanh toán</div>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-secondary" href="/home.html">Về Home</a>
+      <button id="btnLogout" class="btn btn-danger">Đăng xuất</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card pay-grid">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h2 style="margin:0 0 6px">Thông tin thanh toán</h2>
+          <div class="muted">Vui lòng thanh toán đúng <b>Nội dung</b> để admin đối soát nhanh.</div>
+        </div>
+        <div class="row">
+          <span id="typeBadge" class="badge">...</span>
+          <span id="statusBadge" class="badge">...</span>
+        </div>
+      </div>
+
+      <div id="msgBox"></div>
+
+      <div class="kvs">
+        <div class="kv"><span>Mã giao dịch</span><b class="mono" id="txCode">—</b></div>
+        <div class="kv"><span>Loại</span><b id="txType">—</b></div>
+        <div class="kv"><span>Dịch vụ</span><b id="txService">—</b></div>
+        <div class="kv"><span>Số tiền</span><b id="txAmount">—</b></div>
+        <div class="kv"><span>Ghi chú đơn</span><b class="mono" id="txNote">—</b></div>
+        <div class="kv"><span>Thời gian tạo</span><b id="txTime">—</b></div>
+      </div>
+
+      <hr class="divider"/>
+
+      <h3 style="margin:0">Hướng dẫn thanh toán</h3>
+      <div class="muted">
+        - Nếu là <b>Nạp tiền</b>: chuyển khoản theo QR / số tài khoản và ghi đúng <b>Nội dung</b>.<br/>
+        - Nếu là <b>Đơn dịch vụ</b>: hệ thống ghi nhận đơn; admin sẽ xử lý theo trạng thái (nếu bạn dùng “trừ số dư” thì sẽ không cần chuyển khoản).
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr;gap:14px">
+        <div class="card" style="padding:14px">
+          <div class="row" style="justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-weight:800" id="payMethodTitle">MB Bank</div>
+              <div class="muted">Quét QR hoặc chuyển khoản thủ công.</div>
+            </div>
+            <button id="btnCopy" class="btn">Copy nội dung</button>
+          </div>
+
+          <div class="kvs" style="margin-top:10px">
+            <div class="kv"><span>Ngân hàng</span><b id="bankName">MB Bank</b></div>
+            <div class="kv"><span>Chủ tài khoản</span><b id="bankOwner">VAN VIET THANH NHAN</b></div>
+            <div class="kv"><span>Số tài khoản</span><b class="mono" id="bankAcc">7475040109</b></div>
+            <div class="kv"><span>Nội dung chuyển khoản</span><b class="mono" id="bankContent">NAP_XXXX</b></div>
+          </div>
+
+          <div class="warn" style="margin-top:10px">
+            Nếu bạn chuyển sai nội dung, admin sẽ khó đối soát và duyệt chậm.
+          </div>
+        </div>
+
+        <div class="qr-box">
+          <div style="width:100%">
+            <div class="muted" style="margin-bottom:8px">QR thanh toán</div>
+            <img id="qrImg" src="/mb-pr.jpg" alt="QR thanh toán" />
+            <div class="muted" style="margin-top:8px;font-size:12px">
+              Nếu QR không hiện: kiểm tra file ảnh đang nằm trong <b>Public/</b> và tên đúng.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider"/>
+
+      <div class="row" style="justify-content:space-between">
+        <div class="muted">Sau khi chuyển khoản, bấm “Tải lại” để cập nhật trạng thái.</div>
+        <div class="actions">
+          <button id="btnReload" class="btn">Tải lại</button>
+          <a class="btn btn-secondary" href="/home.html#history">Xem lịch sử</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+
+    function fmtVND(n){
+      try { return Number(n).toLocaleString('vi-VN') + "đ"; }
+      catch { return n + "đ"; }
+    }
+    function fmtTime(ts){
+      try { return new Date(ts).toLocaleString('vi-VN'); }
+      catch { return String(ts||""); }
+    }
+    function showMsg(type, text){
+      const box = $("#msgBox");
+      if(!text){ box.innerHTML=""; return; }
+      const cls = type==="ok" ? "ok" : type==="err" ? "err" : "warn";
+      box.innerHTML = `<div class="${cls}">${text}</div>`;
+    }
+
+    async function api(path, opts={}){
+      const res = await fetch(path, { credentials:"include", ...opts });
+      if(!res.ok){
+        const t = await res.text().catch(()=> "");
+        throw new Error(t || ("HTTP " + res.status));
+      }
+      const ct = res.headers.get("content-type")||"";
+      return ct.includes("application/json") ? res.json() : res.text();
+    }
+
+    async function loadTx(){
+      // Ưu tiên lấy từ query ?type=topup&id=...
+      const url = new URL(location.href);
+      let type = url.searchParams.get("type");
+      let id = url.searchParams.get("id");
+
+      // Fallback: lấy từ localStorage
+      if(!type || !id){
+        const pending = localStorage.getItem("pendingPayment");
+        if(pending){
+          try{
+            const obj = JSON.parse(pending);
+            type = type || obj.type;
+            id = id || obj.id;
+          }catch{}
+        }
+      }
+
+      if(!type || !id){
+        showMsg("err","Không tìm thấy giao dịch để hiển thị. Vui lòng tạo đơn/nạp tiền lại từ Home.");
+        return;
+      }
+
+      // Lấy dữ liệu giao dịch:
+      // - Nếu server có endpoint /api/topups/:id và /api/orders/:id thì dùng
+      // - Nếu không có thì fallback /api/history rồi lọc.
+      let tx = null;
+      try{
+        if(type === "topup") tx = await api(`/api/topups/${encodeURIComponent(id)}`);
+        else if(type === "order") tx = await api(`/api/orders/${encodeURIComponent(id)}`);
+      }catch(e){
+        try{
+          const hist = await api(`/api/history`);
+          const arr = (type === "topup") ? (hist.topups||[]) : (hist.orders||[]);
+          tx = arr.find(x => String(x.id) === String(id));
+        }catch(e2){
+          showMsg("err","Không tải được dữ liệu. Hãy đăng nhập lại hoặc thử Tải lại.");
+          return;
+        }
+      }
+
+      if(!tx){
+        showMsg("err","Không tìm thấy giao dịch theo ID. Có thể dữ liệu đã bị reset trên Render.");
+        return;
+      }
+
+      // Render UI
+      const isTopup = (type === "topup");
+      $("#typeBadge").textContent = isTopup ? "NẠP TIỀN" : "ĐƠN DỊCH VỤ";
+      $("#txType").textContent = isTopup ? "Nạp tiền" : "Đơn dịch vụ";
+      $("#txCode").textContent = isTopup ? (tx.code || ("TOPUP_" + tx.id)) : ("ORDER_" + tx.id);
+      $("#txService").textContent = isTopup ? "Nạp số dư" : (tx.service || "—");
+      $("#txAmount").textContent = fmtVND(tx.amount || 0);
+      $("#txNote").textContent = (tx.note || "—");
+      $("#txTime").textContent = fmtTime(tx.createdAt || tx.created_at || Date.now());
+
+      const status = (tx.status || "pending");
+      $("#statusBadge").textContent = status.toUpperCase();
+
+      // Thanh toán: chỉ áp dụng cho topup (đơn dịch vụ có thể trừ số dư)
+      if(isTopup){
+        const method = (tx.method || "MB Bank");
+        $("#payMethodTitle").textContent = method;
+        // Nếu bạn có nhiều QR, đổi theo method:
+        // - MB: /mb-pr.jpg
+        // - ZaloPay: /zalopay.jpg (nếu bạn thêm file)
+        const methodKey = String(method).toLowerCase();
+        if(methodKey.includes("zalo")){
+          $("#qrImg").src = "/zalopay.jpg";
+          $("#bankName").textContent = "ZaloPay";
+          $("#bankAcc").textContent = "—";
+          $("#bankOwner").textContent = "—";
+        }else{
+          $("#qrImg").src = "/mb-pr.jpg";
+          $("#bankName").textContent = "MB Bank";
+          $("#bankOwner").textContent = "VAN VIET THANH NHAN";
+          $("#bankAcc").textContent = "7475040109";
+        }
+
+        const content = tx.code || ("NAP_" + (tx.id || "XXXX"));
+        $("#bankContent").textContent = content;
+
+        if(status === "approved" || status === "done"){
+          showMsg("ok","Nạp tiền đã được duyệt. Số dư đã được cộng.");
+        }else{
+          showMsg("warn","Trạng thái đang chờ duyệt. Hãy chuyển khoản đúng nội dung rồi bấm Tải lại.");
+        }
+      } else {
+        // order
+        // Nếu đơn bạn đang dùng trừ số dư -> có thể hiển thị thông báo khác
+        if(status === "done" || status === "completed"){
+          showMsg("ok","Đơn đã hoàn thành.");
+        } else {
+          showMsg("warn","Đơn đã tạo. Admin sẽ xử lý theo trạng thái hiển thị.");
+        }
+      }
+
+      // Copy nội dung chuyển khoản
+      $("#btnCopy").onclick = async () => {
+        const text = $("#bankContent").textContent.trim();
+        try{
+          await navigator.clipboard.writeText(text);
+          showMsg("ok","Đã copy nội dung chuyển khoản: " + text);
+        }catch{
+          showMsg("warn","Không copy được trên trình duyệt này. Bạn copy thủ công: " + text);
+        }
+      };
+
+      // Reload
+      $("#btnReload").onclick = () => location.reload();
+    }
+
+    $("#btnLogout").onclick = async () => {
+      try{ await fetch("/api/logout", { method:"POST", credentials:"include" }); }catch{}
+      localStorage.removeItem("pendingPayment");
+      location.href = "/index.html";
+    };
+
+    // Nếu chưa login -> đá về login
+    (async () => {
+      try{
+        await api("/api/me");
+        await loadTx();
+      }catch(e){
+        location.href = "/index.html";
+      }
+    })();
+  </script>
+</body>
+  </html>
