@@ -1,188 +1,267 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Shop Gà Con • Dịch vụ Blox Fruit</title>
-  <link rel="stylesheet" href="/app.css"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Shop Gà Con - Home</title>
+  <link rel="stylesheet" href="app.css" />
 </head>
-
-<body class="app">
-<header class="topbar">
-  <div class="brand">
-    <div class="logo">SG</div>
+<body>
+  <div class="topbar">
     <div>
       <div class="title">Shop Gà Con</div>
-      <div class="sub">Dịch vụ Blox Fruit</div>
+      <div class="muted" id="hello"></div>
+    </div>
+    <div class="top-actions">
+      <a class="btn ghost" href="admin.html">Admin</a>
+      <button class="btn" onclick="logout()">Đăng xuất</button>
     </div>
   </div>
 
-  <div class="actions">
-    <span id="meName" class="badge">...</span>
-    <button class="btn btn-danger" id="btnLogout">Đăng xuất</button>
-  </div>
-</header>
+  <div class="container">
+    <div class="grid">
 
-<main class="container">
+      <div class="card">
+        <h3>Dịch vụ</h3>
+        <div class="muted">Chọn dịch vụ → ghi chú → tạo đơn → thanh toán theo mã DON_…</div>
+        <div id="services"></div>
+      </div>
 
-<!-- ================= DỊCH VỤ ================= -->
-<section class="card">
-  <h2>Dịch vụ</h2>
-  <p class="muted">Chọn dịch vụ → ghi chú (acc/yêu cầu) → tạo đơn. Trạng thái hiển thị ở Lịch sử.</p>
+      <div class="card">
+        <h3>Nạp tiền</h3>
+        <div class="muted">Tạo mã → chuyển khoản đúng nội dung → admin duyệt</div>
 
-  <!-- CÀY LEVEL -->
-  <h3>Cày Level / Beli / Frag / Mastery</h3>
+        <label>Phương thức</label>
+        <select id="method">
+          <option>MB Bank</option>
+        </select>
 
-  <div class="service">
-    <span>Lv 1 – 700</span><b>10.000đ</b>
-    <input placeholder="VD: acc/mk, yêu cầu, thời gian rảnh..." id="note_lv1"/>
-    <button onclick="createOrder('Lv 1-700',10000,'note_lv1')">Tạo đơn</button>
-  </div>
+        <label>Số tiền (VND)</label>
+        <input id="amount" inputmode="numeric" placeholder="vd: 50000" />
+        <button class="btn" onclick="createTopup()">Tạo mã nạp</button>
 
-  <div class="service">
-    <span>Lv 700 – 1500</span><b>10.000đ</b>
-    <input id="note_lv2"/>
-    <button onclick="createOrder('Lv 700-1500',10000,'note_lv2')">Tạo đơn</button>
-  </div>
+        <div class="hint">Tạo mã xong sẽ chuyển sang trang thanh toán.</div>
+      </div>
 
-  <div class="service">
-    <span>Lv 1500 – Max</span><b>20.000đ</b>
-    <input id="note_lv3"/>
-    <button onclick="createOrder('Lv 1500-Max',20000,'note_lv3')">Tạo đơn</button>
-  </div>
+      <div class="card">
+        <div class="row-between">
+          <div>
+            <h3>Lịch sử</h3>
+            <div class="muted">Đơn hàng + nạp tiền</div>
+          </div>
+          <button class="btn ghost" onclick="reloadAll()">Tải lại</button>
+        </div>
 
-  <div class="service">
-    <span>Lv 1 – Max (Godhuman)</span><b>50.000đ</b>
-    <input id="note_lv4"/>
-    <button onclick="createOrder('Lv 1-Max + Godhuman',50000,'note_lv4')">Tạo đơn</button>
-  </div>
+        <div class="subcard">
+          <h4>Đơn hàng</h4>
+          <div id="orders" class="list"></div>
+        </div>
 
-  <div class="service">
-    <span>9M Beli</span><b>10.000đ</b>
-    <input id="note_beli"/>
-    <button onclick="createOrder('9M Beli',10000,'note_beli')">Tạo đơn</button>
-  </div>
+        <div class="subcard">
+          <h4>Nạp tiền</h4>
+          <div id="topups" class="list"></div>
+        </div>
+      </div>
 
-  <div class="service">
-    <span>20K Fragment</span><b>10.000đ</b>
-    <input id="note_frag"/>
-    <button onclick="createOrder('20K Fragment',10000,'note_frag')">Tạo đơn</button>
+    </div>
   </div>
 
-  <!-- BOUNTY -->
-  <h3>Bounty Hunt</h3>
-
-  <div class="service">
-    <span>1M Bounty Hải Tặc</span><b>10.000đ</b>
-    <input id="note_bt1"/>
-    <button onclick="createOrder('1M Bounty Hải Tặc',10000,'note_bt1')">Tạo đơn</button>
-  </div>
-
-  <div class="service">
-    <span>1M Bounty Hải Quân</span><b>15.000đ</b>
-    <input id="note_bt2"/>
-    <button onclick="createOrder('1M Bounty Hải Quân',15000,'note_bt2')">Tạo đơn</button>
-  </div>
-</section>
-
-<!-- ================= NẠP TIỀN ================= -->
-<section class="card">
-  <h2>Nạp tiền</h2>
-  <p class="muted">Tạo mã → chuyển khoản đúng nội dung → admin duyệt.</p>
-
-  <label>Phương thức</label>
-  <select id="payMethod">
-    <option>MB Bank</option>
-    <option>ZaloPay</option>
-  </select>
-
-  <label>Số tiền (VND)</label>
-  <input id="payAmount" type="number" placeholder="VD: 50000"/>
-
-  <button class="btn" onclick="createTopup()">Tạo mã nạp</button>
-
-  <div id="topupResult" class="muted"></div>
-</section>
-
-<!-- ================= LỊCH SỬ ================= -->
-<section class="card" id="history">
-  <h2>Lịch sử</h2>
-  <button class="btn btn-secondary" onclick="loadHistory()">Tải lại</button>
-  <div id="historyList" class="muted">Đang tải...</div>
-</section>
-
-</main>
-
-<!-- NÚT CHAT -->
-<a href="https://www.facebook.com/share/1ajgzqUGdh/"
-   target="_blank"
-   class="chat-btn">💬</a>
+  <a class="float-msg" href="https://www.facebook.com/share/1ajgzqUGdh/" target="_blank" rel="noopener">💬</a>
 
 <script>
-/* ========= AUTH ========= */
-async function api(path, opts={}){
-  const r = await fetch(path,{credentials:'include',...opts});
-  if(!r.ok) throw new Error(await r.text());
-  return r.json();
-}
+  const u = JSON.parse(localStorage.getItem("user") || "null");
+  if (!u) location.href = "index.html";
 
-async function init(){
-  try{
-    const me = await api('/api/me');
-    document.getElementById('meName').innerText = me.username;
-    loadHistory();
-  }catch{
-    location.href='/index.html';
+  function logout() {
+    localStorage.clear();
+    location.href = "index.html";
   }
-}
-init();
 
-document.getElementById('btnLogout').onclick = async ()=>{
-  await fetch('/api/logout',{method:'POST'});
-  location.href='/index.html';
-};
+  function formatVND(n) {
+    n = Number(n || 0);
+    return n.toLocaleString("vi-VN") + "đ";
+  }
 
-/* ========= TẠO ĐƠN ========= */
-async function createOrder(service,amount,noteId){
-  const note = document.getElementById(noteId).value;
-  const data = await api('/api/orders',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({service,amount,note})
-  });
-  localStorage.setItem('pendingPayment',JSON.stringify({type:'order',id:data.id}));
-  location.href=`/payment.html?type=order&id=${data.id}`;
-}
+  async function refreshMe() {
+    const r = await fetch("/api/me/" + encodeURIComponent(u.username));
+    const d = await r.json();
+    if (r.ok) {
+      localStorage.setItem("user", JSON.stringify(d.user));
+      hello.innerHTML = `Xin chào <b>${d.user.username}</b> • Số dư: <b>${formatVND(d.user.balance)}</b>`;
+    } else {
+      hello.textContent = "Không lấy được thông tin user";
+    }
+  }
 
-/* ========= NẠP ========= */
-async function createTopup(){
-  const method=document.getElementById('payMethod').value;
-  const amount=document.getElementById('payAmount').value;
-  if(!amount) return alert('Nhập số tiền');
+  const SERVICES = [
+    { title: "Bàng Giá Cày Thuê Blox Fruit", items: [
+      { name:"Lv 1-700", price:10000 },
+      { name:"Lv 700-1500", price:10000 },
+      { name:"Lv 1500-max", price:20000 },
+      { name:"Lv 1-max (cả lấy godhuman)", price:50000 },
+      { name:"9m beli", price:10000 },
+      { name:"20k frag", price:10000 },
+      { name:"1-600 mas (mele + kiếm + trái có m1)", price:10000 },
+      { name:"1-600 mas (súng + trái ko có m1)", price:20000 }
+    ]},
+    { title: "Lấy Melle / Items", items: [
+      { name:"Lấy Death step/Sharkman karate/Electric claw/Dragon talon (10k/1 võ)", price:10000 },
+      { name:"Lấy Godhuman + cày full skill (Đủ nguyên liệu)", price:40000 },
+      { name:"Lấy Godhuman (Chưa đủ nguyên liệu)", price:20000 },
+      { name:"Lấy Sanguine art (đã kéo tim về tiki)", price:10000 },
+      { name:"Lấy Curse dual katana", price:20000 },
+      { name:"Lấy Shisui/Saddi/Wanno (7k/1 cây, cả cày mas)", price:7000 },
+      { name:"Lấy True Triple Katana (đã có 3 kiếm, chỉ cày mas)", price:5000 },
+      { name:"Lấy Fox lamp", price:40000 },
+      { name:"Lấy Tushita", price:10000 },
+      { name:"Lấy Yama", price:10000 },
+      { name:"Lấy Shark Anchor", price:20000 },
+      { name:"Lấy Soul guitar", price:10000 },
+      { name:"Lấy Dark Fragment", price:7000 },
+      { name:"Nâng sao kiếm/súng (2k/1)", price:2000 },
+      { name:"Lấy Haki legendary (20k/3 màu)", price:20000 }
+    ]},
+    { title: "Up tộc v4", items: [
+      { name:"Lấy tộc Cyborg", price:20000 },
+      { name:"Lấy tộc Ghoul", price:10000 },
+      { name:"Up tộc v1-v3", price:10000 },
+      { name:"Gạt cần (Có mảnh gương, đánh rip)", price:5000 },
+      { name:"Gạt cần (Chưa đánh rip, dough king)", price:20000 },
+      { name:"Up v4 1 gear", price:7000 },
+      { name:"Up v4 full gear (bao frag, cả gear đổi)", price:40000 }
+    ]},
+    { title: "Leviathan", items: [
+      { name:"Phá IDK", price:10000 },
+      { name:"Kéo tim về Tiki", price:30000 },
+      { name:"Kéo tim về Hydra", price:40000 }
+    ]},
+    { title: "Draco Update", items: [
+      { name:"Lấy full đai", price:20000 },
+      { name:"Lấy tộc Draco v1", price:7000 },
+      { name:"Up Draco v1-v3 (yêu cầu > 3.5m beli)", price:10000 },
+      { name:"Lấy Dragon Heart", price:7000 },
+      { name:"Lấy Dragon Storm", price:15000 },
+      { name:"Lấy 1 trứng", price:7000 },
+      { name:"Up gear Draco (7k/1 gear đã train)", price:7000 },
+      { name:"Up gear Draco full gear (35k/full gear bao f)", price:35000 },
+      { name:"Full combo A-Z", price:150000 }
+    ]},
+    { title: "Bounty Hunt", items: [
+      { name:"1m Bounty hải tặc", price:10000 },
+      { name:"1m Bounty hải quân", price:15000 }
+    ]}
+  ];
 
-  const data = await api('/api/topups',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({method,amount})
-  });
+  function esc(s){ return String(s).replace(/'/g,"\\'"); }
 
-  localStorage.setItem('pendingPayment',JSON.stringify({type:'topup',id:data.id}));
-  location.href=`/payment.html?type=topup&id=${data.id}`;
-}
+  function renderServices() {
+    services.innerHTML = SERVICES.map((cat, ci) => {
+      const itemsHtml = cat.items.map((it, i) => {
+        const id = `note_${ci}_${i}`;
+        return `
+          <div class="service-item">
+            <div class="service-left">
+              <div class="service-name">${it.name}</div>
+              <div class="service-price">${formatVND(it.price)}</div>
+            </div>
+            <div class="service-right">
+              <input id="${id}" class="note" placeholder="Ghi chú: acc/mk, yêu cầu, thời gian rảnh..." />
+              <button class="btn" onclick="createOrder('${esc(it.name)}', ${it.price}, document.getElementById('${id}').value)">
+                Tạo đơn
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
 
-/* ========= LỊCH SỬ ========= */
-async function loadHistory(){
-  const h = await api('/api/history');
-  let html='<h4>Đơn dịch vụ</h4>';
-  h.orders.forEach(o=>{
-    html+=`<div>${o.service} | ${o.amount}đ | ${o.status}</div>`;
-  });
-  html+='<h4>Nạp tiền</h4>';
-  h.topups.forEach(t=>{
-    html+=`<div>${t.code} | ${t.amount}đ | ${t.status}</div>`;
-  });
-  document.getElementById('historyList').innerHTML=html;
-}
+      return `<div class="category"><div class="category-title">${cat.title}</div>${itemsHtml}</div>`;
+    }).join("");
+  }
+
+  // Tạo đơn -> lưu vào localStorage -> payment.html?type=order
+  async function createOrder(service, price, note) {
+    const r = await fetch("/api/order", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        username: u.username,
+        service,
+        price,
+        note: (note||"").trim()
+      })
+    });
+    const d = await r.json();
+    if(!r.ok) return alert(d.msg || "Lỗi tạo đơn");
+
+    localStorage.setItem("pay_order", JSON.stringify(d));
+    location.href = "payment.html?type=order";
+  }
+
+  // Nạp -> payment.html?type=topup
+  async function createTopup() {
+    const amt = Number(amount.value || 0);
+    if (amt <= 0) return alert("Nhập số tiền hợp lệ");
+
+    const r = await fetch("/api/topup", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ username: u.username, amount: amt, method: method.value })
+    });
+    const d = await r.json();
+    if(!r.ok) return alert(d.msg || "Lỗi tạo mã nạp");
+
+    localStorage.setItem("pay_topup", JSON.stringify(d.topup));
+    location.href = "payment.html?type=topup";
+  }
+
+  async function loadOrders() {
+    const r = await fetch("/api/orders/" + encodeURIComponent(u.username));
+    const d = await r.json();
+    if(!r.ok) { orders.innerHTML = `<div class="muted">Không tải được đơn</div>`; return; }
+    if(!d.length) { orders.innerHTML = `<div class="muted">Chưa có đơn</div>`; return; }
+
+    orders.innerHTML = d.map(o => `
+      <div class="row">
+        <div class="row-main">
+          <div class="row-title">${o.service}</div>
+          <div class="row-sub">
+            ${formatVND(o.price)} • ${o.time}<br>
+            <b>Thanh toán:</b> ${o.paidStatus || "Chưa thanh toán"} • <b>Mã:</b> ${o.payCode || ""}<br>
+            <b>Trạng thái:</b> ${o.status}${o.adminNote ? ` • <b>Admin:</b> ${o.adminNote}` : ""}<br>
+            <b>Ghi chú:</b> ${o.note || "(trống)"}
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function loadTopups() {
+    const r = await fetch("/api/topups/" + encodeURIComponent(u.username));
+    const d = await r.json();
+    if(!r.ok) { topups.innerHTML = `<div class="muted">Không tải được nạp</div>`; return; }
+    if(!d.length) { topups.innerHTML = `<div class="muted">Chưa có lịch sử nạp</div>`; return; }
+
+    topups.innerHTML = d.map(t => `
+      <div class="row">
+        <div class="row-main">
+          <div class="row-title">${t.method} • ${formatVND(t.amount)}</div>
+          <div class="row-sub">
+            <b>Mã:</b> ${t.code} • ${t.time}<br>
+            <b>Trạng thái:</b> ${t.status}
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function reloadAll() {
+    await refreshMe();
+    await loadOrders();
+    await loadTopups();
+  }
+
+  renderServices();
+  reloadAll();
 </script>
 </body>
-      </html>
+</html>
