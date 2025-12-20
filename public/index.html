@@ -1,184 +1,135 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Shop Gà Con - Đăng nhập</title>
   <link rel="stylesheet" href="app.css" />
-  <style>
-    .auth-wrap{max-width:980px;margin:0 auto;padding:18px}
-    .auth-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
-    @media (max-width:860px){.auth-grid{grid-template-columns:1fr}}
-    .small{font-size:12px}
-    .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    @media (max-width:520px){.row2{grid-template-columns:1fr}}
-    .pass-wrap{display:flex;gap:8px;align-items:center}
-    .icon-btn{min-width:44px;height:42px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#e8eeff;cursor:pointer}
-  </style>
 </head>
+<body class="center">
 
-<body class="page">
-  <div class="auth-wrap">
-    <div class="topbar">
+  <div class="card card-lg">
+    <div class="brand">
+      <div class="logo">GC</div>
       <div>
-        <b>Shop Gà Con</b>
-        <div class="muted small">Đăng nhập user để vào trang Home</div>
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <a class="btn" href="admin.html">Admin</a>
-        <a class="btn" target="_blank" rel="noopener" href="https://www.facebook.com/share/1ajgzqUGdh/">Liên hệ</a>
+        <h2>Shop Gà Con</h2>
+        <div class="muted">Đăng nhập để đặt dịch vụ / nạp tiền</div>
       </div>
     </div>
 
-    <div class="auth-grid">
-      <!-- LOGIN -->
-      <div class="card">
-        <h2>Đăng nhập</h2>
+    <div class="tabs">
+      <button class="tab active" data-tab="login">Đăng nhập</button>
+      <button class="tab" data-tab="register">Đăng ký</button>
+      <button class="tab" data-tab="forgot">Quên MK</button>
+    </div>
 
-        <div class="field">
-          <label>Tên tài khoản</label>
-          <input id="l_user" placeholder="vd: user123" autocomplete="username" />
-        </div>
+    <div class="panel show" id="tab-login">
+      <label>Tên tài khoản</label>
+      <input id="l_user" placeholder="vd: gacon" autocomplete="username" />
 
-        <div class="field">
-          <label>Mật khẩu</label>
-          <div class="pass-wrap">
-            <input id="l_pass" type="password" placeholder="••••••" autocomplete="current-password" style="flex:1" />
-            <button class="icon-btn" id="toggleLoginPass" title="Hiện/ẩn mật khẩu">👁</button>
-          </div>
-        </div>
+      <label>Mật khẩu</label>
+      <input id="l_pass" type="password" placeholder="••••••••" autocomplete="current-password" />
 
-        <button class="btn primary" id="btnLogin">Đăng nhập</button>
-        <div id="loginMsg" class="muted" style="margin-top:10px"></div>
+      <button class="btn" onclick="login()">Đăng nhập</button>
+      <div id="msg" class="msg"></div>
 
-        <div class="hr"></div>
-        <div class="muted small">
-          Nếu đăng nhập xong không vào Home: hãy chắc chắn file <b>home.html</b> nằm trong thư mục <b>public</b>.
-        </div>
+      <div class="hint">
+        Admin? <a href="admin.html">Đăng nhập admin</a>
+      </div>
+    </div>
+
+    <div class="panel" id="tab-register">
+      <label>Tên tài khoản</label>
+      <input id="r_user" placeholder="Tên tài khoản" autocomplete="username" />
+
+      <label>Email (dùng để khôi phục)</label>
+      <input id="r_email" placeholder="email@example.com" autocomplete="email" />
+
+      <label>Mật khẩu</label>
+      <input id="r_pass" type="password" placeholder="Tạo mật khẩu" autocomplete="new-password" />
+
+      <button class="btn" onclick="register()">Đăng ký</button>
+      <div id="msg2" class="msg"></div>
+    </div>
+
+    <div class="panel" id="tab-forgot">
+      <div class="muted" style="margin-bottom:10px">
+        Xác minh bằng <b>tên tài khoản + email</b> rồi đặt mật khẩu mới.
       </div>
 
-      <!-- REGISTER + RESET -->
-      <div class="card">
-        <h2>Đăng ký</h2>
+      <label>Tên tài khoản</label>
+      <input id="f_user" placeholder="Tên tài khoản" />
 
-        <div class="row2">
-          <div class="field">
-            <label>Tên tài khoản</label>
-            <input id="r_user" placeholder="vd: thanhnhan" autocomplete="username" />
-          </div>
-          <div class="field">
-            <label>Gmail (khôi phục)</label>
-            <input id="r_gmail" placeholder="vd: abc@gmail.com" autocomplete="email" />
-          </div>
-        </div>
+      <label>Email</label>
+      <input id="f_email" placeholder="Email đã đăng ký" />
 
-        <div class="field">
-          <label>Mật khẩu</label>
-          <div class="pass-wrap">
-            <input id="r_pass" type="password" placeholder="••••••" autocomplete="new-password" style="flex:1" />
-            <button class="icon-btn" id="toggleRegPass" title="Hiện/ẩn mật khẩu">👁</button>
-          </div>
-        </div>
+      <label>Mật khẩu mới</label>
+      <input id="f_pass" type="password" placeholder="Mật khẩu mới" />
 
-        <button class="btn" id="btnRegister">Tạo tài khoản</button>
-        <div id="regMsg" class="muted" style="margin-top:10px"></div>
-
-        <div class="hr"></div>
-
-        <h2>Khôi phục tài khoản</h2>
-        <div class="muted small">Nhập đúng <b>Gmail đã đăng ký</b> để đổi mật khẩu.</div>
-
-        <div class="row2" style="margin-top:10px">
-          <div class="field">
-            <label>Tên tài khoản</label>
-            <input id="fp_user" placeholder="user123" />
-          </div>
-          <div class="field">
-            <label>Gmail</label>
-            <input id="fp_gmail" placeholder="abc@gmail.com" />
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Mật khẩu mới</label>
-          <div class="pass-wrap">
-            <input id="fp_newpass" type="password" placeholder="••••••" style="flex:1" />
-            <button class="icon-btn" id="toggleFpPass" title="Hiện/ẩn mật khẩu">👁</button>
-          </div>
-        </div>
-
-        <button class="btn primary" id="btnReset">Đổi mật khẩu</button>
-        <div id="fpMsg" class="muted" style="margin-top:10px"></div>
-      </div>
+      <button class="btn" onclick="forgot()">Đổi mật khẩu</button>
+      <div id="msg3" class="msg"></div>
     </div>
   </div>
 
-  <script>
-    async function api(path, method="GET", body=null){
-      const res = await fetch(path, {
-        method,
-        headers: body ? {"Content-Type":"application/json"} : {},
-        body: body ? JSON.stringify(body) : null
+<script>
+  document.querySelectorAll(".tab").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      document.querySelectorAll(".panel").forEach(p=>p.classList.remove("show"));
+      document.getElementById("tab-"+tab).classList.add("show");
+    });
+  });
+
+  async function login() {
+    msg.textContent = "";
+    try {
+      const r = await fetch("/api/login", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ username: l_user.value, password: l_pass.value })
       });
-      return res.json();
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.msg || "Sai tài khoản hoặc mật khẩu");
+      localStorage.setItem("user", JSON.stringify(d.user));
+      location.href = "home.html";
+    } catch(e) {
+      msg.textContent = e.message || "Sai tài khoản hoặc mật khẩu";
     }
+  }
 
-    // Nếu đã có username thì vào thẳng home
-    const savedUser = localStorage.getItem("username");
-    if (savedUser) window.location.assign("home.html");
-
-    function togglePass(inputId){
-      const el = document.getElementById(inputId);
-      el.type = (el.type === "password") ? "text" : "password";
+  async function register() {
+    msg2.textContent = "";
+    try {
+      const r = await fetch("/api/register", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ username: r_user.value, email: r_email.value, password: r_pass.value })
+      });
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.msg || "Đăng ký thất bại");
+      msg2.textContent = d.msg;
+    } catch(e) {
+      msg2.textContent = e.message;
     }
-    document.getElementById("toggleLoginPass").onclick = () => togglePass("l_pass");
-    document.getElementById("toggleRegPass").onclick   = () => togglePass("r_pass");
-    document.getElementById("toggleFpPass").onclick    = () => togglePass("fp_newpass");
+  }
 
-    // REGISTER
-    document.getElementById("btnRegister").onclick = async () => {
-      const username = document.getElementById("r_user").value.trim();
-      const gmail = document.getElementById("r_gmail").value.trim();
-      const password = document.getElementById("r_pass").value.trim();
-      const msg = document.getElementById("regMsg");
-      msg.textContent = "Đang tạo...";
-
-      const data = await api("/api/auth/register", "POST", { username, gmail, password });
-      if (!data.ok) { msg.textContent = "Lỗi: " + (data.msg || data.error || "Không rõ"); return; }
-
-      msg.textContent = "Tạo tài khoản thành công. Bạn có thể đăng nhập.";
-    };
-
-    // LOGIN
-    document.getElementById("btnLogin").onclick = async () => {
-      const username = document.getElementById("l_user").value.trim();
-      const password = document.getElementById("l_pass").value.trim();
-      const msg = document.getElementById("loginMsg");
-      msg.textContent = "Đang đăng nhập...";
-
-      const data = await api("/api/auth/login", "POST", { username, password });
-      if (!data.ok) { msg.textContent = "Sai tài khoản hoặc mật khẩu."; return; }
-
-      // Lưu username để home dùng
-      localStorage.setItem("username", data.user.username);
-
-      // Chuyển trang bằng đường dẫn tương đối (KHÔNG dùng /home.html)
-      window.location.assign("home.html");
-    };
-
-    // RESET PASSWORD
-    document.getElementById("btnReset").onclick = async () => {
-      const username = document.getElementById("fp_user").value.trim();
-      const gmail = document.getElementById("fp_gmail").value.trim();
-      const newPassword = document.getElementById("fp_newpass").value.trim();
-      const msg = document.getElementById("fpMsg");
-      msg.textContent = "Đang xử lý...";
-
-      const data = await api("/api/auth/reset-password", "POST", { username, gmail, newPassword });
-      if (!data.ok) { msg.textContent = "Lỗi: " + (data.msg || data.error || "Không rõ"); return; }
-
-      msg.textContent = "Đổi mật khẩu thành công. Giờ bạn đăng nhập lại.";
-    };
-  </script>
+  async function forgot() {
+    msg3.textContent = "";
+    try {
+      const r = await fetch("/api/forgot", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ username: f_user.value, email: f_email.value, newPassword: f_pass.value })
+      });
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.msg || "Thất bại");
+      msg3.textContent = d.msg;
+    } catch(e) {
+      msg3.textContent = e.message;
+    }
+  }
+</script>
 </body>
-        </html>
+</html>
