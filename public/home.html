@@ -29,18 +29,54 @@
 
       <div class="card">
         <h3>Nạp tiền</h3>
-        <div class="muted">Tạo mã → chuyển khoản đúng nội dung → admin duyệt</div>
+        <div class="muted">Nạp MB hoặc nạp thẻ cào</div>
 
-        <label>Phương thức</label>
-        <select id="method">
-          <option>MB Bank</option>
-        </select>
+        <div class="subcard">
+          <h4>Nạp MB Bank</h4>
 
-        <label>Số tiền (VND)</label>
-        <input id="amount" inputmode="numeric" placeholder="vd: 50000" />
-        <button class="btn" onclick="createTopup()">Tạo mã nạp</button>
+          <label>Phương thức</label>
+          <select id="method">
+            <option>MB Bank</option>
+          </select>
 
-        <div class="hint">Tạo mã xong sẽ chuyển sang trang thanh toán.</div>
+          <label>Số tiền (VND)</label>
+          <input id="amount" inputmode="numeric" placeholder="vd: 50000" />
+          <button class="btn" onclick="createTopup()">Tạo mã nạp</button>
+          <div class="hint">Tạo mã xong sẽ chuyển sang trang thanh toán.</div>
+        </div>
+
+        <div class="subcard">
+          <h4>Nạp thẻ cào</h4>
+          <div class="muted">Phí: 20k/50k thu 15%, từ 100k trở lên thu 20%.</div>
+
+          <label>Loại thẻ</label>
+          <select id="cardProvider">
+            <option>Viettel</option>
+            <option>Vinaphone</option>
+            <option>Mobifone</option>
+            <option>Garena</option>
+            <option>Zing</option>
+          </select>
+
+          <label>Mệnh giá (VND)</label>
+          <select id="cardAmount">
+            <option value="20000">20.000</option>
+            <option value="50000">50.000</option>
+            <option value="100000">100.000</option>
+            <option value="200000">200.000</option>
+            <option value="500000">500.000</option>
+          </select>
+
+          <label>Serial</label>
+          <input id="cardSerial" placeholder="Nhập số serial" />
+
+          <label>Mã thẻ</label>
+          <input id="cardPin" placeholder="Nhập mã thẻ" />
+
+          <button class="btn" onclick="createCardTopup()">Gửi thẻ</button>
+          <div class="msg" id="cardMsg"></div>
+        </div>
+
       </div>
 
       <div class="card">
@@ -58,8 +94,13 @@
         </div>
 
         <div class="subcard">
-          <h4>Nạp tiền</h4>
+          <h4>Nạp MB</h4>
           <div id="topups" class="list"></div>
+        </div>
+
+        <div class="subcard">
+          <h4>Nạp thẻ cào</h4>
+          <div id="cardTopups" class="list"></div>
         </div>
       </div>
 
@@ -178,7 +219,6 @@
     }).join("");
   }
 
-  // Tạo đơn -> lưu vào localStorage -> payment.html?type=order
   async function createOrder(service, price, note) {
     const r = await fetch("/api/order", {
       method:"POST",
@@ -197,7 +237,6 @@
     location.href = "payment.html?type=order";
   }
 
-  // Nạp -> payment.html?type=topup
   async function createTopup() {
     const amt = Number(amount.value || 0);
     if (amt <= 0) return alert("Nhập số tiền hợp lệ");
@@ -212,6 +251,37 @@
 
     localStorage.setItem("pay_topup", JSON.stringify(d.topup));
     location.href = "payment.html?type=topup";
+  }
+
+  async function createCardTopup(){
+    cardMsg.textContent = "";
+    try{
+      const body = {
+        username: u.username,
+        provider: cardProvider.value,
+        amount: Number(cardAmount.value),
+        serial: cardSerial.value,
+        pin: cardPin.value
+      };
+
+      const r = await fetch("/api/cardtopup",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(body)
+      });
+
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.msg || "Lỗi nạp thẻ");
+
+      cardMsg.textContent = `Đã gửi thẻ. Mã yêu cầu: ${d.card.code} • Nhận: ${formatVND(d.card.netAmount)}`;
+      cardSerial.value = "";
+      cardPin.value = "";
+
+      await loadCardTopups();
+      await refreshMe();
+    }catch(e){
+      cardMsg.textContent = e.message;
+    }
   }
 
   async function loadOrders() {
@@ -254,10 +324,31 @@
     `).join("");
   }
 
+  async function loadCardTopups(){
+    const r = await fetch("/api/cardtopups/" + encodeURIComponent(u.username));
+    const d = await r.json();
+    if(!r.ok) { cardTopups.innerHTML = `<div class="muted">Không tải được lịch sử thẻ</div>`; return; }
+    if(!d.length) { cardTopups.innerHTML = `<div class="muted">Chưa có nạp thẻ</div>`; return; }
+
+    cardTopups.innerHTML = d.map(c => `
+      <div class="row">
+        <div class="row-main">
+          <div class="row-title">${c.provider} • ${formatVND(c.amount)}</div>
+          <div class="row-sub">
+            <b>Mã:</b> ${c.code} • ${c.time}<br>
+            <b>Phí:</b> ${c.feePercent}% → <b>Nhận:</b> ${formatVND(c.netAmount)}<br>
+            <b>Trạng thái:</b> ${c.status}${c.adminNote ? ` • <b>Admin:</b> ${c.adminNote}` : ""}
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
   async function reloadAll() {
     await refreshMe();
     await loadOrders();
     await loadTopups();
+    await loadCardTopups();
   }
 
   renderServices();
