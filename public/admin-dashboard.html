@@ -10,7 +10,7 @@
   <div class="topbar">
     <div>
       <div class="title">Admin Dashboard</div>
-      <div class="muted">Quản lý đơn hàng • nạp tiền • user</div>
+      <div class="muted">Quản lý đơn • nạp MB • nạp thẻ</div>
     </div>
     <div class="top-actions">
       <button class="btn ghost" onclick="reload()">Tải lại</button>
@@ -22,14 +22,18 @@
     <div class="grid">
 
       <div class="card">
-        <h3>Topup (Duyệt nạp)</h3>
+        <h3>Topup (MB) - Duyệt nạp</h3>
         <div id="topups" class="list"></div>
+
+        <div class="subcard">
+          <h3>Card Topups - Duyệt thẻ cào</h3>
+          <div id="cardTopups" class="list"></div>
+        </div>
       </div>
 
       <div class="card">
         <div class="row-between">
           <h3>Orders (Đơn hàng)</h3>
-
           <select id="orderFilter" onchange="renderOrders()">
             <option value="all">Tất cả</option>
             <option value="unpaid">Chưa thanh toán</option>
@@ -41,7 +45,7 @@
         </div>
 
         <div class="muted" style="margin-top:8px">
-          A) Đơn <b>chưa thanh toán</b> sẽ bị khóa: không cho chuyển <b>Đang làm / Hoàn thành</b>.
+          Đơn <b>chưa thanh toán</b> bị khóa: chỉ cho <b>Chờ xử lý</b> hoặc <b>Từ chối</b>.
         </div>
 
         <div id="orders" class="list" style="margin-top:12px"></div>
@@ -59,7 +63,7 @@
   const token = localStorage.getItem("adminToken");
   if(!token) location.href = "admin.html";
 
-  let CACHE = { users: [], orders: [], topups: [] };
+  let CACHE = { users: [], orders: [], topups: [], cardTopups: [] };
 
   function formatVND(n){ return Number(n||0).toLocaleString("vi-VN")+"đ"; }
 
@@ -87,15 +91,17 @@
     CACHE = {
       users: data.users || [],
       orders: data.orders || [],
-      topups: data.topups || []
+      topups: data.topups || [],
+      cardTopups: data.cardTopups || []
     };
 
     renderTopups();
+    renderCardTopups();
     renderOrders();
     renderUsers();
   }
 
-  // ===== TOPUPS =====
+  // ===== TOPUPS MB =====
   function renderTopups(){
     const t = CACHE.topups;
     topups.innerHTML = t.length ? t.map(x => `
@@ -111,7 +117,7 @@
           ` : `<span class="pill">${x.status}</span>`}
         </div>
       </div>
-    `).join("") : `<div class="muted">Chưa có topup</div>`;
+    `).join("") : `<div class="muted">Chưa có topup MB</div>`;
   }
 
   async function approveTopup(id, approve){
@@ -119,7 +125,39 @@
     await load();
   }
 
-  // ===== ORDERS =====
+  // ===== CARD TOPUPS =====
+  function renderCardTopups(){
+    const t = CACHE.cardTopups;
+    cardTopups.innerHTML = t.length ? t.map(x => `
+      <div class="row">
+        <div class="row-main">
+          <div class="row-title">${x.username} • ${x.provider} • ${formatVND(x.amount)}</div>
+          <div class="row-sub">
+            <b>Mã:</b> ${x.code} • ${x.time}<br>
+            <b>Phí:</b> ${x.feePercent}% → <b>Nhận:</b> ${formatVND(x.netAmount)}<br>
+            <b>Serial:</b> ${x.serial} • <b>Mã thẻ:</b> ${x.pin}<br>
+            <b>Trạng thái:</b> ${x.status}${x.adminNote ? ` • <b>Note:</b> ${x.adminNote}` : ""}
+          </div>
+
+          <div style="margin-top:10px" class="inline">
+            <input id="cardnote_${x.id}" placeholder="Ghi chú admin" />
+            ${x.status === "Chờ duyệt" ? `
+              <button class="btn" onclick="approveCard(${x.id}, true)">Duyệt</button>
+              <button class="btn ghost" onclick="approveCard(${x.id}, false)">Từ chối</button>
+            ` : `<span class="pill">${x.status}</span>`}
+          </div>
+        </div>
+      </div>
+    `).join("") : `<div class="muted">Chưa có nạp thẻ</div>`;
+  }
+
+  async function approveCard(id, approve){
+    const adminNote = document.getElementById("cardnote_"+id).value;
+    await api("/api/admin/card-approve", { id, approve, adminNote });
+    await load();
+  }
+
+  // ===== ORDERS A+B =====
   function matchesFilter(order, filter){
     const paid = (order.paidStatus || "Chưa thanh toán");
     const st = (order.status || "Chờ xử lý");
@@ -140,7 +178,7 @@
     orders.innerHTML = list.length ? list.map(x => {
       const paidStatus = x.paidStatus || "Chưa thanh toán";
       const payCode = x.payCode || "(chưa có mã)";
-      const locked = (paidStatus !== "Đã thanh toán"); // A lock
+      const locked = (paidStatus !== "Đã thanh toán");
 
       const options = locked
         ? ["Chờ xử lý", "Từ chối"]
@@ -154,7 +192,6 @@
         <div class="row">
           <div class="row-main">
             <div class="row-title">${x.username} • ${x.service} • ${formatVND(x.price)}</div>
-
             <div class="row-sub">
               <b>Thanh toán:</b> ${paidStatus} • <b>Mã:</b> ${payCode}<br>
               <b>Ghi chú:</b> ${x.note || "(trống)"}<br>
@@ -163,25 +200,16 @@
             </div>
 
             <div style="margin-top:10px" class="inline">
-              <select id="st_${x.id}">
-                ${optHtml}
-              </select>
-
+              <select id="st_${x.id}">${optHtml}</select>
               <input id="an_${x.id}" placeholder="Ghi chú admin"
                 value="${(x.adminNote||"").replace(/"/g,'&quot;')}" />
-
               <button class="btn" onclick="updateOrder(${x.id}, ${locked})">Lưu</button>
               <button class="btn ghost" onclick="deleteOrder(${x.id})">Xoá</button>
-
               <button class="btn" onclick="markPaid(${x.id}, true)">Đã thanh toán</button>
               <button class="btn ghost" onclick="markPaid(${x.id}, false)">Chưa thanh toán</button>
             </div>
 
-            ${locked ? `
-              <div class="msg">
-                Đơn này chưa thanh toán → bị khóa không cho chuyển sang “Đang làm / Hoàn thành”.
-              </div>
-            ` : ``}
+            ${locked ? `<div class="msg">Chưa thanh toán → không cho “Đang làm/Hoàn thành”.</div>` : ``}
           </div>
         </div>
       `;
@@ -229,13 +257,12 @@
   }
 
   async function deleteUser(username){
-    if(!confirm("Xoá user '"+username+"' ? (xoá cả đơn + topup)")) return;
+    if(!confirm("Xoá user '"+username+"' ? (xoá cả đơn + topup + thẻ)")) return;
     await api("/api/admin/user-delete", { username });
     await load();
   }
 
   async function reload(){ await load(); }
-
   load();
 </script>
 </body>
