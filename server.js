@@ -54,6 +54,9 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// ===== HEALTH =====
+app.get("/health", (req, res) => res.status(200).send("ok"));
+
 // ===== AUTH - USER =====
 app.post("/api/register", (req, res) => {
   const username = normStr(req.body.username);
@@ -160,6 +163,37 @@ app.get("/api/orders/:username", (req, res) => {
   res.json(data.orders.filter((o) => o.username === req.params.username));
 });
 
+// ===== PAY ORDER BY BALANCE (MUA BẰNG SỐ DƯ) =====
+app.post("/api/order/pay-balance", (req, res) => {
+  const username = normStr(req.body.username);
+  const orderId = Number(req.body.orderId || 0);
+
+  if (!username || !orderId) return res.status(400).json({ msg: "Thiếu dữ liệu thanh toán" });
+
+  const data = readData();
+  const user = data.users.find((u) => u.username === username);
+  if (!user) return res.status(404).json({ msg: "User không tồn tại" });
+
+  const order = data.orders.find((o) => o.id === orderId && o.username === username);
+  if (!order) return res.status(404).json({ msg: "Không tìm thấy đơn" });
+
+  if ((order.paidStatus || "Chưa thanh toán") === "Đã thanh toán") {
+    return res.status(400).json({ msg: "Đơn đã thanh toán rồi" });
+  }
+
+  const price = Number(order.price || 0);
+  const bal = Number(user.balance || 0);
+  if (bal < price) return res.status(400).json({ msg: "Số dư không đủ để thanh toán" });
+
+  user.balance = bal - price;
+  order.paidStatus = "Đã thanh toán";
+  order.paidTime = new Date().toLocaleString();
+  order.payMethod = "Số dư";
+
+  writeData(data);
+  res.json({ ok: true, balance: user.balance, order });
+});
+
 // ===== TOPUP (MB) =====
 app.post("/api/topup", (req, res) => {
   const username = normStr(req.body.username);
@@ -197,7 +231,6 @@ app.get("/api/topups/:username", (req, res) => {
 // ===== CARD TOPUP (THẺ CÀO) =====
 function calcCardFeePercent(amount) {
   amount = Number(amount || 0);
-  // bạn yêu cầu: 50k trở xuống 15%, >=100k 20%
   if (amount >= 100000) return 20;
   return 15;
 }
@@ -218,7 +251,6 @@ app.post("/api/cardtopup", (req, res) => {
     return res.status(400).json({ msg: "Nhà mạng không hợp lệ" });
   }
 
-  // bạn yêu cầu chỉ 20k/50k/100k/200k/500k
   const allowedAmounts = [20000, 50000, 100000, 200000, 500000];
   if (!allowedAmounts.includes(amount)) {
     return res.status(400).json({ msg: "Mệnh giá không hợp lệ (chỉ 20k/50k/100k/200k/500k)" });
@@ -334,7 +366,6 @@ app.post("/api/admin/topup-approve", requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// admin duyệt thẻ cào: cộng netAmount
 app.post("/api/admin/card-approve", requireAdmin, (req, res) => {
   const id = Number(req.body.id);
   const approve = Boolean(req.body.approve);
