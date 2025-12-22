@@ -23,7 +23,7 @@
 
       <div class="card">
         <h3>Dịch vụ</h3>
-        <div class="muted">Chọn dịch vụ → ghi chú → tạo đơn → thanh toán theo mã DON_…</div>
+        <div class="muted">Có 2 cách: (1) chuyển khoản theo mã DON_… hoặc (2) mua bằng số dư</div>
         <div id="services"></div>
       </div>
 
@@ -208,7 +208,10 @@
             <div class="service-right">
               <input id="${id}" class="note" placeholder="Ghi chú: acc/mk, yêu cầu, thời gian rảnh..." />
               <button class="btn" onclick="createOrder('${esc(it.name)}', ${it.price}, document.getElementById('${id}').value)">
-                Tạo đơn
+                Tạo đơn (chuyển khoản)
+              </button>
+              <button class="btn ghost" onclick="createOrderAndPayBalance('${esc(it.name)}', ${it.price}, document.getElementById('${id}').value)">
+                Mua bằng số dư
               </button>
             </div>
           </div>
@@ -219,6 +222,7 @@
     }).join("");
   }
 
+  // ===== ĐƠN CHUYỂN KHOẢN =====
   async function createOrder(service, price, note) {
     const r = await fetch("/api/order", {
       method:"POST",
@@ -237,6 +241,46 @@
     location.href = "payment.html?type=order";
   }
 
+  // ===== MUA BẰNG SỐ DƯ =====
+  async function payOrderByBalance(orderId){
+    const r = await fetch("/api/order/pay-balance",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ username: u.username, orderId })
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.msg || "Thanh toán thất bại");
+    return d;
+  }
+
+  async function createOrderAndPayBalance(service, price, note){
+    // tạo đơn trước
+    const r = await fetch("/api/order", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        username: u.username,
+        service,
+        price,
+        note: (note||"").trim()
+      })
+    });
+    const d = await r.json();
+    if(!r.ok) return alert(d.msg || "Lỗi tạo đơn");
+
+    // thanh toán bằng số dư
+    try{
+      await payOrderByBalance(d.id);
+      alert("Mua bằng số dư thành công!");
+      await reloadAll();
+    }catch(e){
+      alert(e.message);
+      // nếu số dư không đủ, vẫn còn đơn chưa thanh toán trong lịch sử
+      await reloadAll();
+    }
+  }
+
+  // ===== NẠP MB =====
   async function createTopup() {
     const amt = Number(amount.value || 0);
     if (amt <= 0) return alert("Nhập số tiền hợp lệ");
@@ -253,6 +297,7 @@
     location.href = "payment.html?type=topup";
   }
 
+  // ===== NẠP THẺ CÀO =====
   async function createCardTopup(){
     cardMsg.textContent = "";
     try{
@@ -273,7 +318,7 @@
       const d = await r.json();
       if(!r.ok) throw new Error(d.msg || "Lỗi nạp thẻ");
 
-      cardMsg.textContent = `Đã gửi thẻ. Mã yêu cầu: ${d.card.code} • Nhận: ${formatVND(d.card.netAmount)}`;
+      cardMsg.textContent = `Đã gửi thẻ. Mã: ${d.card.code} • Nhận: ${formatVND(d.card.netAmount)}`;
       cardSerial.value = "";
       cardPin.value = "";
 
@@ -284,6 +329,7 @@
     }
   }
 
+  // ===== LỊCH SỬ =====
   async function loadOrders() {
     const r = await fetch("/api/orders/" + encodeURIComponent(u.username));
     const d = await r.json();
@@ -298,11 +344,29 @@
             ${formatVND(o.price)} • ${o.time}<br>
             <b>Thanh toán:</b> ${o.paidStatus || "Chưa thanh toán"} • <b>Mã:</b> ${o.payCode || ""}<br>
             <b>Trạng thái:</b> ${o.status}${o.adminNote ? ` • <b>Admin:</b> ${o.adminNote}` : ""}<br>
-            <b>Ghi chú:</b> ${o.note || "(trống)"}
+            <b>Ghi chú:</b> ${o.note || "(trống)"}<br>
+            ${o.payMethod ? `<b>Hình thức:</b> ${o.payMethod}<br>` : ``}
           </div>
+
+          ${(o.paidStatus || "Chưa thanh toán") !== "Đã thanh toán"
+            ? `<div style="margin-top:10px" class="inline">
+                 <button class="btn" onclick="payFromHistory(${o.id})">Thanh toán bằng số dư</button>
+               </div>`
+            : ""
+          }
         </div>
       </div>
     `).join("");
+  }
+
+  async function payFromHistory(orderId){
+    try{
+      await payOrderByBalance(orderId);
+      alert("Thanh toán bằng số dư thành công!");
+      await reloadAll();
+    }catch(e){
+      alert(e.message);
+    }
   }
 
   async function loadTopups() {
