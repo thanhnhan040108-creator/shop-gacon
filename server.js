@@ -23,12 +23,12 @@ const SERVICES = [
     { key:"sung", name:"Súng", price:12000 },
     { key:"kiem", name:"Kiếm", price:10000 },
     { key:"trung_rong", name:"Trứng rồng", price:5000 },
-    { key:"doc_rung", name:"Độc rừng", price:5000 }
+    { key:"toc_rong", name:"tộc rồng", price:5000 }
   ]},
   { group: "ITEM", items: [
     { key:"yama", name:"Yama", price:5000 },
     { key:"tushita", name:"Tushita", price:5000 },
-    { key:"ghep", name:"Ghép", price:5000 },
+    { key:"ghepss", name:"Ghép ss", price:5000 },
     { key:"az_cdk", name:"A-Z CDK (bao all)", price:15000 },
     { key:"az_tt", name:"A-Z TT (bao all)", price:20000 },
     { key:"shark_anchor", name:"Shark Anchor", price:10000 },
@@ -396,3 +396,4 @@ app.post("/api/admin/topups/:id/reject", requireAdmin, (req, res) => {
 
 // ====== Start ======
 app.listen(PORT, () => console.log("Shop-Gacon running:", PORT));
+
