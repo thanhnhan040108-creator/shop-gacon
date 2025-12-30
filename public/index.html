@@ -1,134 +1,169 @@
-<!DOCTYPE html>
+ <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Shop Gà Con - Đăng nhập</title>
-  <link rel="stylesheet" href="app.css" />
+  <title>Shop Gà Con — Đăng nhập</title>
+  <link rel="stylesheet" href="/app.css" />
 </head>
-<body class="center">
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <h1>Shop Gà Con</h1>
+        <div class="sub">Đăng nhập để tạo đơn • nạp tiền • xem lịch sử</div>
+      </div>
+      <span class="badge"><span class="dot"></span> Online</span>
+    </div>
 
-  <div class="card card-lg">
-    <div class="brand">
-      <div class="logo">GC</div>
-      <div>
-        <h2>Shop Gà Con</h2>
-        <div class="muted">Đăng nhập để đặt dịch vụ / nạp tiền</div>
+    <div class="grid two">
+      <div class="card">
+        <div class="head"><h2>Đăng nhập User</h2></div>
+        <div class="body">
+          <div class="label">Tên tài khoản</div>
+          <input id="loginUser" class="input" placeholder="vd: nhan123" />
+          <div class="label">Mật khẩu</div>
+          <input id="loginPass" class="input" type="password" placeholder="••••••" />
+          <div class="hr"></div>
+          <button class="btn primary" onclick="loginUser()">Đăng nhập</button>
+          <button class="btn" style="margin-left:8px" onclick="show('reset')">Quên mật khẩu</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="head"><h2>Tạo tài khoản</h2></div>
+        <div class="body">
+          <div class="label">Email (để khôi phục)</div>
+          <input id="regEmail" class="input" placeholder="vd: you@gmail.com" />
+          <div class="label">Tên tài khoản</div>
+          <input id="regUser" class="input" placeholder="vd: nhan123" />
+          <div class="label">Mật khẩu</div>
+          <input id="regPass" class="input" type="password" placeholder="••••••" />
+          <div class="hr"></div>
+          <button class="btn primary" onclick="register()">Đăng ký</button>
+        </div>
       </div>
     </div>
 
-    <div class="tabs">
-      <button class="tab active" data-tab="login">Đăng nhập</button>
-      <button class="tab" data-tab="register">Đăng ký</button>
-      <button class="tab" data-tab="forgot">Quên MK</button>
-    </div>
-
-    <div class="panel show" id="tab-login">
-      <label>Tên tài khoản</label>
-      <input id="l_user" placeholder="vd: gacon" autocomplete="username" />
-
-      <label>Mật khẩu</label>
-      <input id="l_pass" type="password" placeholder="••••••••" autocomplete="current-password" />
-
-      <button class="btn" onclick="login()">Đăng nhập</button>
-      <div id="msg" class="msg"></div>
-
-      <div class="hint">
-        Admin? <a href="admin.html">Đăng nhập admin</a>
+    <div class="card" id="resetCard" style="display:none">
+      <div class="head"><h2>Khôi phục tài khoản</h2></div>
+      <div class="body">
+        <div class="muted">Nhập đúng <b>username</b> + <b>email</b> đã đăng ký, rồi đặt mật khẩu mới.</div>
+        <div class="grid" style="margin-top:10px">
+          <div>
+            <div class="label">Tên tài khoản</div>
+            <input id="rsUser" class="input" />
+          </div>
+          <div>
+            <div class="label">Email</div>
+            <input id="rsEmail" class="input" />
+          </div>
+          <div>
+            <div class="label">Mật khẩu mới</div>
+            <input id="rsPass" class="input" type="password" />
+          </div>
+        </div>
+        <div class="hr"></div>
+        <button class="btn primary" onclick="resetPass()">Đổi mật khẩu</button>
+        <button class="btn" style="margin-left:8px" onclick="show('login')">Đóng</button>
       </div>
     </div>
 
-    <div class="panel" id="tab-register">
-      <label>Tên tài khoản</label>
-      <input id="r_user" placeholder="Tên tài khoản" autocomplete="username" />
-
-      <label>Email (dùng để khôi phục)</label>
-      <input id="r_email" placeholder="email@example.com" autocomplete="email" />
-
-      <label>Mật khẩu</label>
-      <input id="r_pass" type="password" placeholder="Tạo mật khẩu" autocomplete="new-password" />
-
-      <button class="btn" onclick="register()">Đăng ký</button>
-      <div id="msg2" class="msg"></div>
-    </div>
-
-    <div class="panel" id="tab-forgot">
-      <div class="muted" style="margin-bottom:10px">
-        Xác minh bằng <b>tên tài khoản + email</b> rồi đặt mật khẩu mới.
+    <div class="card">
+      <div class="head"><h2>Admin</h2></div>
+      <div class="body">
+        <div class="muted">Đăng nhập admin để duyệt nạp/đơn.</div>
+        <div class="grid" style="margin-top:10px">
+          <div>
+            <div class="label">Admin username</div>
+            <input id="adUser" class="input" placeholder="vd: gacon furina" />
+          </div>
+          <div>
+            <div class="label">Admin password</div>
+            <input id="adPass" class="input" type="password" placeholder="vd: 1234,5678" />
+          </div>
+        </div>
+        <div class="hr"></div>
+        <button class="btn primary" onclick="loginAdmin()">Đăng nhập Admin</button>
+        <button class="btn" style="margin-left:8px" onclick="location.href='/admin.html'">Vào trang Admin</button>
       </div>
-
-      <label>Tên tài khoản</label>
-      <input id="f_user" placeholder="Tên tài khoản" />
-
-      <label>Email</label>
-      <input id="f_email" placeholder="Email đã đăng ký" />
-
-      <label>Mật khẩu mới</label>
-      <input id="f_pass" type="password" placeholder="Mật khẩu mới" />
-
-      <button class="btn" onclick="forgot()">Đổi mật khẩu</button>
-      <div id="msg3" class="msg"></div>
     </div>
   </div>
 
+  <div class="toast" id="toast"><b id="tTitle">Thông báo</b><div id="tMsg" class="muted"></div></div>
+
 <script>
-  document.querySelectorAll(".tab").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
-      btn.classList.add("active");
-      const tab = btn.dataset.tab;
-      document.querySelectorAll(".panel").forEach(p=>p.classList.remove("show"));
-      document.getElementById("tab-"+tab).classList.add("show");
+  const toast = (title, msg) => {
+    document.getElementById('tTitle').textContent = title;
+    document.getElementById('tMsg').textContent = msg || '';
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2500);
+  };
+
+  function show(which){
+    document.getElementById('resetCard').style.display = (which==='reset') ? '' : 'none';
+    window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'});
+  }
+
+  async function register(){
+    const email = document.getElementById('regEmail').value.trim();
+    const username = document.getElementById('regUser').value.trim();
+    const password = document.getElementById('regPass').value;
+    const r = await fetch('/api/auth/register', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email, username, password})
     });
-  });
-
-  async function login() {
-    msg.textContent = "";
-    try {
-      const r = await fetch("/api/login", {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ username: l_user.value, password: l_pass.value })
-      });
-      const d = await r.json();
-      if(!r.ok) throw new Error(d.msg || "Sai tài khoản hoặc mật khẩu");
-      localStorage.setItem("user", JSON.stringify(d.user));
-      location.href = "home.html";
-    } catch(e) {
-      msg.textContent = e.message || "Sai tài khoản hoặc mật khẩu";
-    }
+    const j = await r.json();
+    if(!j.ok) return toast('Lỗi', j.message || 'Không đăng ký được');
+    toast('OK', 'Tạo tài khoản thành công. Hãy đăng nhập.');
   }
 
-  async function register() {
-    msg2.textContent = "";
-    try {
-      const r = await fetch("/api/register", {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ username: r_user.value, email: r_email.value, password: r_pass.value })
-      });
-      const d = await r.json();
-      if(!r.ok) throw new Error(d.msg || "Đăng ký thất bại");
-      msg2.textContent = d.msg;
-    } catch(e) {
-      msg2.textContent = e.message;
-    }
+  async function loginUser(){
+    const username = document.getElementById('loginUser').value.trim();
+    const password = document.getElementById('loginPass').value;
+    const r = await fetch('/api/auth/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username, password})
+    });
+    const j = await r.json();
+    if(!j.ok) return toast('Lỗi', j.message || 'Đăng nhập thất bại');
+    localStorage.setItem('userToken', j.token);
+    localStorage.setItem('userInfo', JSON.stringify(j.user));
+    location.href = '/home.html';
   }
 
-  async function forgot() {
-    msg3.textContent = "";
-    try {
-      const r = await fetch("/api/forgot", {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ username: f_user.value, email: f_email.value, newPassword: f_pass.value })
-      });
-      const d = await r.json();
-      if(!r.ok) throw new Error(d.msg || "Thất bại");
-      msg3.textContent = d.msg;
-    } catch(e) {
-      msg3.textContent = e.message;
-    }
+  async function resetPass(){
+    const username = document.getElementById('rsUser').value.trim();
+    const email = document.getElementById('rsEmail').value.trim();
+    const newPassword = document.getElementById('rsPass').value;
+    const r = await fetch('/api/auth/reset', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username, email, newPassword})
+    });
+    const j = await r.json();
+    if(!j.ok) return toast('Lỗi', j.message || 'Không đổi được');
+    toast('OK', 'Đổi mật khẩu thành công');
+    show('login');
+  }
+
+  async function loginAdmin(){
+    const username = document.getElementById('adUser').value.trim();
+    const password = document.getElementById('adPass').value;
+    const r = await fetch('/api/admin/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username, password})
+    });
+    const j = await r.json();
+    if(!j.ok) return toast('Lỗi', j.message || 'Admin login thất bại');
+    localStorage.setItem('adminToken', j.token);
+    localStorage.setItem('adminInfo', JSON.stringify(j.admin));
+    toast('OK', 'Đăng nhập admin thành công');
+    location.href = '/admin-dashboard.html';
   }
 </script>
 </body>
