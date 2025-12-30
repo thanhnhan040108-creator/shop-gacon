@@ -1,627 +1,449 @@
 const express = require("express");
-const crypto = require("crypto");
-const { createClient } = require("@supabase/supabase-js");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true }));
 
-app.use(express.json());
-app.use(express.static("public"));
+// ====== Paths ======
+const DATA_PATH = path.join(__dirname, "data.json");
+const PUBLIC_DIR = path.join(__dirname, "public");
 
-// ================== SUPABASE ==================
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error("❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in env");
+// ====== Helpers ======
+function readDB() {
+  try {
+    if (!fs.existsSync(DATA_PATH)) {
+      fs.writeFileSync(
+        DATA_PATH,
+        JSON.stringify({ users: [], admins: [], orders: [], topups: [] }, null, 2),
+        "utf8"
+      );
+    }
+    const raw = fs.readFileSync(DATA_PATH, "utf8");
+    return JSON.parse(raw || "{}");
+  } catch (e) {
+    return { users: [], admins: [], orders: [], topups: [] };
+  }
 }
 
-const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-  auth: { persistSession: false },
+function writeDB(db) {
+  fs.writeFileSync(DATA_PATH, JSON.stringify(db, null, 2), "utf8");
+}
+
+function uid(prefix = "id") {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function nowISO() {
+  return new Date().toISOString();
+}
+
+// Basic token (demo): lưu localStorage phía client, server chỉ check khớp
+function makeToken(kind, id) {
+  return `${kind}.${id}.${Math.random().toString(36).slice(2)}.${Date.now().toString(36)}`;
+}
+
+function feeForCard(amount) {
+  // Bạn yêu cầu:
+  // - Dưới 50k: chiết khấu 20%
+  // - Trên 100k: chiết khấu 15%
+  // - Còn lại: lấy 15%
+  if (amount < 50000) return 0.2;
+  return 0.15;
+}
+
+// ====== Services (VOCALA) ======
+const SERVICES = [
+  {
+    group: "Combo Draco",
+    items: [
+      { key: "combo_draco_100k", name: "Combo Draco", price: 100000, note: "" },
+      { key: "dai_10k", name: "Đai", price: 10000, note: "" },
+      { key: "sung_12k", name: "Súng", price: 12000, note: "" },
+      { key: "kiem_10k", name: "Kiếm", price: 10000, note: "" },
+      { key: "trung_rong_5k", name: "Trứng rồng", price: 5000, note: "" },
+      { key: "doc_rung_5k", name: "Độc rừng", price: 5000, note: "" }
+    ]
+  },
+  {
+    group: "ITEM",
+    items: [
+      { key: "yama_5k", name: "Yama", price: 5000, note: "" },
+      { key: "tushita_5k", name: "Tushita", price: 5000, note: "" },
+      { key: "ghep_5k", name: "Ghép", price: 5000, note: "" },
+      { key: "az_cdk_15k", name: "A-Z CDK (bao all)", price: 15000, note: "" },
+      { key: "az_tt_20k", name: "A-Z TT (bao all)", price: 20000, note: "" },
+      { key: "shark_anchor_10k", name: "Shark Anchor", price: 10000, note: "" },
+      { key: "soul_guitar_10k", name: "Soul Guitar", price: 10000, note: "" },
+      { key: "yoru_v3_20k", name: "Yoru V3", price: 20000, note: "Yêu cầu full 4 tộc v3" },
+      { key: "foxlamp_15k", name: "Foxlamp", price: 15000, note: "" }
+    ]
+  },
+  {
+    group: "LEVI",
+    items: [
+      { key: "keo_hydra_20k", name: "Kéo tim về Hydra", price: 20000, note: "" },
+      { key: "keo_tiki_20k", name: "Kéo tim về Tiki", price: 20000, note: "" },
+      { key: "mele_mau_30k", name: "Mele máu", price: 30000, note: "" }
+    ]
+  },
+  {
+    group: "Ken và Mas",
+    items: [
+      { key: "haki_qs_v2_20k", name: "Haki quan sát V2", price: 20000, note: "" },
+      { key: "mas_1_600_5k", name: "1-600 mastery", price: 5000, note: "" }
+    ]
+  },
+  {
+    group: "RAID / MELEE",
+    items: [
+      { key: "lv_1_700_3k", name: "Cày level 1-700", price: 3000, note: "" },
+      { key: "lv_700_1500_8k", name: "Cày level 700-1500", price: 8000, note: "" },
+      { key: "lv_1500_max_15k", name: "Cày level 1500-max", price: 15000, note: "" },
+      { key: "lv_1_max_20k", name: "Cày level 1-max", price: 20000, note: "" },
+      { key: "gear_5k", name: "Gear", price: 5000, note: "" },
+      { key: "fg_20k", name: "FG", price: 20000, note: "" },
+      { key: "v1_v3_5k", name: "V1-v3", price: 5000, note: "" }
+    ]
+  },
+  {
+    group: "BELI / FRAG",
+    items: [
+      { key: "beli_2m_1k", name: "2m beli", price: 1000, note: "" },
+      { key: "frag_2k_1k", name: "2k frag", price: 1000, note: "" }
+    ]
+  }
+];
+
+// ====== Static ======
+app.use(express.static(PUBLIC_DIR));
+
+// ====== Health ======
+app.get("/api/health", (req, res) => res.json({ ok: true, time: nowISO() }));
+
+// ====== Services ======
+app.get("/api/services", (req, res) => res.json({ ok: true, services: SERVICES }));
+
+// ====== User Auth ======
+app.post("/api/auth/register", (req, res) => {
+  const { username, password, email } = req.body || {};
+  if (!username || !password || !email) return res.status(400).json({ ok: false, message: "Thiếu username/password/email" });
+
+  const db = readDB();
+  const exists = db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase());
+  if (exists) return res.status(409).json({ ok: false, message: "Tên tài khoản đã tồn tại" });
+
+  const user = {
+    id: uid("u"),
+    username: String(username),
+    password: String(password),
+    email: String(email),
+    balance: 0,
+    createdAt: nowISO()
+  };
+  db.users.push(user);
+  writeDB(db);
+
+  return res.json({ ok: true, message: "Tạo tài khoản thành công" });
 });
 
-// ================== HELPERS ==================
-function normStr(x) {
-  return String(x ?? "").trim();
-}
-function isEmail(x) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(x || "").trim());
-}
-function newToken() {
-  return crypto.randomBytes(24).toString("hex");
-}
+app.post("/api/auth/login", (req, res) => {
+  const { username, password } = req.body || {};
+  const db = readDB();
+  const user = db.users.find(
+    u => u.username.toLowerCase() === String(username || "").toLowerCase() && u.password === String(password || "")
+  );
+  if (!user) return res.status(401).json({ ok: false, message: "Sai tài khoản hoặc mật khẩu" });
 
-// ================== ADMIN SESSION (in-memory) ==================
-const adminSessions = new Map(); // token -> { createdAt }
+  const token = makeToken("user", user.id);
+  return res.json({
+    ok: true,
+    token,
+    user: { id: user.id, username: user.username, email: user.email, balance: user.balance }
+  });
+});
 
-function requireAdmin(req, res, next) {
-  const token = req.headers["x-admin-token"];
-  if (!token || !adminSessions.has(token)) return res.status(401).json({ msg: "Unauthorized" });
+// reset password (demo) bằng email + username
+app.post("/api/auth/reset", (req, res) => {
+  const { username, email, newPassword } = req.body || {};
+  const db = readDB();
+  const user = db.users.find(
+    u => u.username.toLowerCase() === String(username || "").toLowerCase() && u.email.toLowerCase() === String(email || "").toLowerCase()
+  );
+  if (!user) return res.status(404).json({ ok: false, message: "Không tìm thấy tài khoản khớp email" });
+  if (!newPassword) return res.status(400).json({ ok: false, message: "Thiếu mật khẩu mới" });
+
+  user.password = String(newPassword);
+  writeDB(db);
+  return res.json({ ok: true, message: "Đổi mật khẩu thành công" });
+});
+
+// ====== Admin Auth ======
+app.post("/api/admin/login", (req, res) => {
+  const { username, password } = req.body || {};
+  const db = readDB();
+  const admin = db.admins.find(
+    a => a.username.toLowerCase() === String(username || "").toLowerCase() && a.password === String(password || "")
+  );
+  if (!admin) return res.status(401).json({ ok: false, message: "Sai admin hoặc mật khẩu" });
+
+  const token = makeToken("admin", admin.id);
+  return res.json({
+    ok: true,
+    token,
+    admin: { id: admin.id, username: admin.username, role: admin.role }
+  });
+});
+
+// ====== Middleware check tokens (demo) ======
+function requireUser(req, res, next) {
+  const token = req.headers["x-auth-token"];
+  const uidPart = String(token || "").split(".")[1];
+  const db = readDB();
+  const user = db.users.find(u => u.id === uidPart);
+  if (!token || !uidPart || !user) return res.status(401).json({ ok: false, message: "Chưa đăng nhập" });
+  req._db = db;
+  req.user = user;
+  req.token = token;
   next();
 }
 
-// ================== HEALTH ==================
-app.get("/health", (req, res) => res.status(200).send("ok"));
-
-// ================== USER AUTH ==================
-app.post("/api/register", async (req, res) => {
-  try {
-    const username = normStr(req.body.username);
-    const password = normStr(req.body.password);
-    const email = normStr(req.body.email).toLowerCase();
-
-    if (!username || !password || !email) return res.status(400).json({ msg: "Thiếu thông tin" });
-    if (!isEmail(email)) return res.status(400).json({ msg: "Email không hợp lệ" });
-
-    const { data: existed, error: e1 } = await sb
-      .from("users")
-      .select("username")
-      .eq("username", username)
-      .maybeSingle();
-
-    if (e1) return res.status(500).json({ msg: "Lỗi DB" });
-    if (existed) return res.status(400).json({ msg: "Tài khoản đã tồn tại" });
-
-    const { error: e2 } = await sb.from("users").insert([{ username, password, email, balance: 0 }]);
-    if (e2) return res.status(500).json({ msg: e2.message });
-
-    res.json({ msg: "Đăng ký thành công" });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
-});
-
-app.post("/api/login", async (req, res) => {
-  try {
-    const username = normStr(req.body.username);
-    const password = normStr(req.body.password);
-
-    const { data: user, error } = await sb
-      .from("users")
-      .select("id, username, email, balance")
-      .eq("username", username)
-      .eq("password", password)
-      .maybeSingle();
-
-    if (error) return res.status(500).json({ msg: "Lỗi DB" });
-    if (!user) return res.status(401).json({ msg: "Sai tài khoản hoặc mật khẩu" });
-
-    res.json({ user });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
-});
-
-// Quên mật khẩu: username + email -> set password mới
-app.post("/api/forgot", async (req, res) => {
-  try {
-    const username = normStr(req.body.username);
-    const email = normStr(req.body.email).toLowerCase();
-    const newPassword = normStr(req.body.newPassword);
-
-    if (!username || !email || !newPassword) return res.status(400).json({ msg: "Thiếu thông tin" });
-    if (!isEmail(email)) return res.status(400).json({ msg: "Email không hợp lệ" });
-
-    const { data: user, error: e1 } = await sb
-      .from("users")
-      .select("username")
-      .eq("username", username)
-      .eq("email", email)
-      .maybeSingle();
-
-    if (e1) return res.status(500).json({ msg: "Lỗi DB" });
-    if (!user) return res.status(404).json({ msg: "Không khớp tài khoản + email" });
-
-    const { error: e2 } = await sb
-      .from("users")
-      .update({ password: newPassword })
-      .eq("username", username)
-      .eq("email", email);
-
-    if (e2) return res.status(500).json({ msg: e2.message });
-    res.json({ msg: "Đổi mật khẩu thành công. Hãy đăng nhập lại." });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
-});
-
-app.get("/api/me/:username", async (req, res) => {
-  try {
-    const username = req.params.username;
-
-    const { data: user, error } = await sb
-      .from("users")
-      .select("id, username, email, balance")
-      .eq("username", username)
-      .maybeSingle();
-
-    if (error) return res.status(500).json({ msg: "Lỗi DB" });
-    if (!user) return res.status(404).json({ msg: "Không tìm thấy user" });
-
-    res.json({ user });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
-});
-
-// ================== ORDERS ==================
-app.post("/api/order", async (req, res) => {
-  try {
-    const username = normStr(req.body.username);
-    const service = normStr(req.body.service);
-    const price = Number(req.body.price || 0);
-    const note = normStr(req.body.note);
-
-    if (!username || !service || !price) return res.status(400).json({ msg: "Thiếu dữ liệu tạo đơn" });
-
-    // check user exists
-    const { data: u, error: eu } = await sb
-      .from("users")
-      .select("username")
-      .eq("username", username)
-      .maybeSingle();
-    if (eu) return res.status(500).json({ msg: "Lỗi DB" });
-    if (!u) return res.status(404).json({ msg: "User không tồn tại" });
-
-    const payCode = "DON_" + crypto.randomBytes(3).toString("hex").toUpperCase();
-
-    const { data: order, error } = await sb
-      .from("orders")
-      .insert([
-        {
-          username,
-          service,
-          price: Math.floor(price),
-          note,
-          pay_code: payCode,
-          paid_status: "Chưa thanh toán",
-          status: "Chờ xử lý",
-          admin_note: "",
-        },
-      ])
-      .select("*")
-      .single();
-
-    if (error) return res.status(500).json({ msg: error.message });
-
-    res.json({
-      id: order.id,
-      username: order.username,
-      service: order.service,
-      price: order.price,
-      note: order.note,
-      payCode: order.pay_code,
-      paidStatus: order.paid_status,
-      payMethod: order.pay_method,
-      paidTime: order.paid_time ? new Date(order.paid_time).toLocaleString("vi-VN") : null,
-      status: order.status,
-      adminNote: order.admin_note,
-      time: new Date(order.created_at).toLocaleString("vi-VN"),
-    });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
-});
-
-app.get("/api/orders/:username", async (req, res) => {
-  try {
-    const username = req.params.username;
-
-    const { data: orders, error } = await sb
-      .from("orders")
-      .select("*")
-      .eq("username", username)
-      .order("id", { ascending: false });
-
-    if (error) return res.status(500).json({ msg: error.message });
-
-    res.json(
-      (orders || []).map((o) => ({
-        id: o.id,
-        username: o.username,
-        service: o.service,
-        price: o.price,
-        note: o.note,
-        payCode: o.pay_code,
-        paidStatus: o.paid_status,
-        payMethod: o.pay_method,
-        paidTime: o.paid_time ? new Date(o.paid_time).toLocaleString("vi-VN") : null,
-        status: o.status,
-        adminNote: o.admin_note,
-        time: new Date(o.created_at).toLocaleString("vi-VN"),
-      }))
-    );
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
-});
-
-// ===== Pay by balance =====
-app.post("/api/order/pay-balance", async (req, res) => {
-  try {
-    const username = normStr(req.body.username);
-    const orderId = Number(req.body.orderId || 0);
-    if (!username || !orderId) return res.status(400).json({ msg: "Thiếu dữ liệu thanh toán" });
-
-    const { data: user, error: e1 } = await sb
-      .from("users")
-      .select("balance")
-      .eq("username", username)
-      .maybeSingle();
-    if (e1) return res.status(500).json({ msg: "Lỗi DB" });
-    if (!user) return res.status(404).json({ msg: "User không tồn tại" });
-
-    const { data: order, error: e2 } = await sb
-      .from("orders")
-      .select("id, price, paid_status")
-      .eq("id", orderId)
-      .eq("username", username)
-      .maybeSingle();
-    if (e2) return res.status(500).json({ msg: "Lỗi DB" });
-    if (!order) return res.status(404).json({ msg: "Không tìm thấy đơn" });
-    if (order.paid_status === "Đã thanh toán") return res.status(400).json({ msg: "Đơn đã thanh toán rồi" });
-
-    const bal = Number(user.balance || 0);
-    const price = Number(order.price || 0);
-    if (bal < price) return res.status(400).json({ msg: "Số dư không đủ để thanh toán" });
-
-    const newBal = bal - price;
-
-    const { error: e3 } = await sb.from("users").update({ balance: newBal }).eq("username", username);
-    if (e3) return res.status(500).json({ msg: e3.message });
-
-    const { data: updated, error: e4 } = await sb
-      .from("orders")
-      .update({
-        paid_status: "Đã thanh toán",
-        pay_method: "Số dư",
-        paid_time: new Date().toISOString(),
-      })
-      .eq("id", orderId)
-      .select("*")
-      .single();
-
-    if (e4) return res.status(500).json({ msg: e4.message });
-
-    res.json({
-      ok: true,
-      balance: newBal,
-      order: {
-        id: updated.id,
-        username: updated.username,
-        service: updated.service,
-        price: updated.price,
-        note: updated.note,
-        payCode: updated.pay_code,
-        paidStatus: updated.paid_status,
-        payMethod: updated.pay_method,
-        paidTime: updated.paid_time ? new Date(updated.paid_time).toLocaleString("vi-VN") : null,
-        status: updated.status,
-        adminNote: updated.admin_note,
-        time: new Date(updated.created_at).toLocaleString("vi-VN"),
-      },
-    });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
-});
-
-// ================== TOPUP MB ==================
-app.post("/api/topup", async (req, res) => {
-  try {
-    const username = normStr(req.body.username);
-    const amount = Number(req.body.amount || 0);
-    const method = normStr(req.body.method || "MB Bank");
-
-    if (!username || amount <= 0) return res.status(400).json({ msg: "Thiếu dữ liệu nạp" });
-
-    const { data: u, error: eu } = await sb
-      .from("users")
-      .select("username")
-      .eq("username", username)
-      .maybeSingle();
-    if (eu) return res.status(500).json({ msg: "Lỗi DB" });
-    if (!u) return res.status(404).json({ msg: "User không tồn tại" });
-
-    const code = "NAP_" + crypto.randomBytes(3).toString("hex").toUpperCase();
-
-    const { data: topup, error } = await sb
-      .from("topups")
-      .insert([{ username, amount: Math.floor(amount), method, code, status: "Chờ duyệt" }])
-      .select("*")
-      .single();
-
-    if (error) return res.status(500).json({ msg: error.message });
-
-    res.json({
-      topup: {
-        id: topup.id,
-        username: topup.username,
-        amount: topup.amount,
-        method: topup.method,
-        code: topup.code,
-        status: topup.status,
-        time: new Date(topup.created_at).toLocaleString("vi-VN"),
-      },
-    });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
-});
-
-app.get("/api/topups/:username", async (req, res) => {
-  try {
-    const username = req.params.username;
-
-    const { data: topups, error } = await sb
-      .from("topups")
-      .select("*")
-      .eq("username", username)
-      .order("id", { ascending: false });
-
-    if (error) return res.status(500).json({ msg: error.message });
-
-    res.json(
-      (topups || []).map((t) => ({
-        id: t.id,
-        username: t.username,
-        amount: t.amount,
-        method: t.method,
-        code: t.code,
-        status: t.status,
-        time: new Date(t.created_at).toLocaleString("vi-VN"),
-      }))
-    );
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
-});
-
-// ================== CARD TOPUP ==================
-function calcCardFeePercent(amount) {
-  amount = Number(amount || 0);
-  if (amount >= 100000) return 20;
-  return 15;
+function requireAdmin(req, res, next) {
+  const token = req.headers["x-admin-token"];
+  const aidPart = String(token || "").split(".")[1];
+  const db = readDB();
+  const admin = db.admins.find(a => a.id === aidPart);
+  if (!token || !aidPart || !admin) return res.status(401).json({ ok: false, message: "Chưa đăng nhập admin" });
+  req._db = db;
+  req.admin = admin;
+  req.token = token;
+  next();
 }
 
-app.post("/api/cardtopup", async (req, res) => {
-  try {
-    const username = normStr(req.body.username);
-    const provider = normStr(req.body.provider);
-    const amount = Number(req.body.amount || 0);
-    const serial = normStr(req.body.serial);
-    const pin = normStr(req.body.pin);
+// ====== Orders ======
+app.post("/api/orders/create", requireUser, (req, res) => {
+  const { serviceKey, note } = req.body || {};
+  if (!serviceKey) return res.status(400).json({ ok: false, message: "Thiếu serviceKey" });
 
-    if (!username || !provider || !serial || !pin || amount <= 0) {
-      return res.status(400).json({ msg: "Thiếu dữ liệu nạp thẻ" });
-    }
-
-    const allowedProviders = ["Viettel", "Vinaphone", "Mobifone", "Garena", "Zing"];
-    if (!allowedProviders.includes(provider)) {
-      return res.status(400).json({ msg: "Nhà mạng không hợp lệ" });
-    }
-
-    const allowedAmounts = [20000, 50000, 100000, 200000, 500000];
-    if (!allowedAmounts.includes(amount)) {
-      return res.status(400).json({ msg: "Mệnh giá không hợp lệ (20k/50k/100k/200k/500k)" });
-    }
-
-    const { data: u, error: eu } = await sb
-      .from("users")
-      .select("username")
-      .eq("username", username)
-      .maybeSingle();
-    if (eu) return res.status(500).json({ msg: "Lỗi DB" });
-    if (!u) return res.status(404).json({ msg: "User không tồn tại" });
-
-    const feePercent = calcCardFeePercent(amount);
-    const netAmount = Math.floor((amount * (100 - feePercent)) / 100);
-    const code = "CARD_" + crypto.randomBytes(3).toString("hex").toUpperCase();
-
-    const { data: card, error } = await sb
-      .from("card_topups")
-      .insert([
-        {
-          username,
-          provider,
-          amount: Math.floor(amount),
-          fee_percent: feePercent,
-          net_amount: netAmount,
-          serial,
-          pin,
-          code,
-          status: "Chờ duyệt",
-          admin_note: "",
-        },
-      ])
-      .select("*")
-      .single();
-
-    if (error) return res.status(500).json({ msg: error.message });
-
-    res.json({
-      card: {
-        id: card.id,
-        code: card.code,
-        username: card.username,
-        provider: card.provider,
-        amount: card.amount,
-        feePercent: card.fee_percent,
-        netAmount: card.net_amount,
-        status: card.status,
-        adminNote: card.admin_note,
-        time: new Date(card.created_at).toLocaleString("vi-VN"),
-      },
-    });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
+  let service = null;
+  for (const g of SERVICES) {
+    const found = g.items.find(i => i.key === serviceKey);
+    if (found) { service = { ...found, group: g.group }; break; }
   }
+  if (!service) return res.status(404).json({ ok: false, message: "Không tìm thấy dịch vụ" });
+
+  const db = req._db;
+  const order = {
+    id: uid("od"),
+    userId: req.user.id,
+    username: req.user.username,
+    serviceKey: service.key,
+    serviceName: service.name,
+    serviceGroup: service.group,
+    price: service.price,
+    note: String(note || ""),
+    status: "PENDING",
+    adminNote: "",
+    createdAt: nowISO(),
+    updatedAt: nowISO()
+  };
+
+  db.orders.unshift(order);
+  writeDB(db);
+  return res.json({ ok: true, order });
 });
 
-app.get("/api/cardtopups/:username", async (req, res) => {
-  try {
-    const username = req.params.username;
-
-    const { data: cards, error } = await sb
-      .from("card_topups")
-      .select("*")
-      .eq("username", username)
-      .order("id", { ascending: false });
-
-    if (error) return res.status(500).json({ msg: error.message });
-
-    res.json(
-      (cards || []).map((c) => ({
-        id: c.id,
-        code: c.code,
-        username: c.username,
-        provider: c.provider,
-        amount: c.amount,
-        feePercent: c.fee_percent,
-        netAmount: c.net_amount,
-        serial: c.serial,
-        pin: c.pin,
-        status: c.status,
-        adminNote: c.admin_note,
-        time: new Date(c.created_at).toLocaleString("vi-VN"),
-      }))
-    );
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
+app.get("/api/history", requireUser, (req, res) => {
+  const db = req._db;
+  const orders = db.orders.filter(o => o.userId === req.user.id);
+  const topups = db.topups.filter(t => t.userId === req.user.id);
+  return res.json({ ok: true, user: { balance: req.user.balance }, orders, topups });
 });
 
-// ================== ADMIN ==================
-app.post("/api/admin/login", (req, res) => {
-  const user = normStr(req.body.user);
-  const pass = normStr(req.body.pass);
+// ====== Topup (Bank: tạo mã nạp) ======
+app.post("/api/topup/bank/create", requireUser, (req, res) => {
+  const { method, amount } = req.body || {};
+  const amt = Number(amount);
+  if (!method) return res.status(400).json({ ok: false, message: "Thiếu method" });
+  if (!Number.isFinite(amt) || amt <= 0) return res.status(400).json({ ok: false, message: "Số tiền không hợp lệ" });
 
-  if (user === process.env.ADMIN_USER && pass === process.env.ADMIN_PASS) {
-    const token = newToken();
-    adminSessions.set(token, { createdAt: Date.now() });
-    return res.json({ ok: true, token });
-  }
-  res.status(401).json({ msg: "Sai admin" });
+  const db = req._db;
+  const code = `NAP_${uid("MB").toUpperCase()}`.replace(/[^A-Z0-9_]/g, "").slice(0, 18);
+
+  const topup = {
+    id: uid("tp"),
+    userId: req.user.id,
+    username: req.user.username,
+    type: "BANK",
+    method: String(method),
+    amount: amt,
+    feeRate: 0,
+    credit: 0,
+    code,
+    status: "WAITING",
+    note: "Chuyển khoản đúng nội dung để admin duyệt.",
+    createdAt: nowISO(),
+    updatedAt: nowISO()
+  };
+
+  db.topups.unshift(topup);
+  writeDB(db);
+  return res.json({ ok: true, topup });
 });
 
-// Lấy toàn bộ dữ liệu cho dashboard
-app.get("/api/admin/data", requireAdmin, async (req, res) => {
-  try {
-    const { data: users, error: eU } = await sb.from("users").select("*").order("id", { ascending: false });
-    if (eU) return res.status(500).json({ msg: eU.message });
+// ====== Topup (Card) - demo: tạo yêu cầu, admin duyệt ======
+app.post("/api/topup/card/create", requireUser, (req, res) => {
+  const { telco, amount, serial, pin } = req.body || {};
+  const amt = Number(amount);
 
-    const { data: orders, error: eO } = await sb.from("orders").select("*").order("id", { ascending: false });
-    if (eO) return res.status(500).json({ msg: eO.message });
+  const allowedTelco = ["Viettel", "Mobifone", "Vinaphone", "Garena", "Zing"];
+  const allowedAmt = [20000, 50000, 100000, 200000, 500000];
 
-    const { data: topups, error: eT } = await sb.from("topups").select("*").order("id", { ascending: false });
-    if (eT) return res.status(500).json({ msg: eT.message });
+  if (!allowedTelco.includes(String(telco))) return res.status(400).json({ ok: false, message: "Nhà mạng không hợp lệ" });
+  if (!allowedAmt.includes(amt)) return res.status(400).json({ ok: false, message: "Mệnh giá không hợp lệ" });
+  if (!serial || !pin) return res.status(400).json({ ok: false, message: "Thiếu serial/mã thẻ" });
 
-    const { data: cardTopups, error: eC } = await sb.from("card_topups").select("*").order("id", { ascending: false });
-    if (eC) return res.status(500).json({ msg: eC.message });
+  const db = req._db;
+  const feeRate = feeForCard(amt);
+  const credit = Math.floor(amt * (1 - feeRate));
 
-    res.json({ users: users || [], orders: orders || [], topups: topups || [], cardTopups: cardTopups || [] });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
+  const topup = {
+    id: uid("tp"),
+    userId: req.user.id,
+    username: req.user.username,
+    type: "CARD",
+    method: String(telco),
+    amount: amt,
+    feeRate,
+    credit,
+    serial: String(serial),
+    pin: String(pin),
+    status: "WAITING",
+    note: `Chiết khấu ${(feeRate * 100).toFixed(0)}% => cộng ${credit}đ sau duyệt`,
+    createdAt: nowISO(),
+    updatedAt: nowISO()
+  };
+
+  db.topups.unshift(topup);
+  writeDB(db);
+  return res.json({ ok: true, topup });
 });
 
-app.post("/api/admin/order-update", requireAdmin, async (req, res) => {
-  try {
-    const id = Number(req.body.id);
-    const status = normStr(req.body.status);
-    const adminNote = normStr(req.body.adminNote);
+// ====== Payment page data ======
+app.get("/api/payment/info", requireUser, (req, res) => {
+  const { orderId, topupId } = req.query || {};
+  const db = req._db;
 
-    const payload = {};
-    if (status) payload.status = status;
-    payload.admin_note = adminNote;
+  let order = null;
+  let topup = null;
 
-    const { error } = await sb.from("orders").update(payload).eq("id", id);
-    if (error) return res.status(500).json({ msg: error.message });
+  if (orderId) order = db.orders.find(o => o.id === String(orderId) && o.userId === req.user.id) || null;
+  if (topupId) topup = db.topups.find(t => t.id === String(topupId) && t.userId === req.user.id) || null;
 
-    res.json({ ok: true });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
+  return res.json({
+    ok: true,
+    bank: {
+      name: "MB Bank",
+      accountName: "VAN VIET THANH NHAN",
+      // Số tài khoản bạn đã dùng trong ảnh (mình không tự bịa thêm, bạn có thể đổi)
+      accountNumber: "7475040109",
+      qrImage: "/mb-qr.jpg"
+    },
+    order,
+    topup
+  });
 });
 
-app.post("/api/admin/order-paid", requireAdmin, async (req, res) => {
-  try {
-    const id = Number(req.body.id);
-    const paid = Boolean(req.body.paid);
-
-    const { error } = await sb
-      .from("orders")
-      .update({ paid_status: paid ? "Đã thanh toán" : "Chưa thanh toán" })
-      .eq("id", id);
-
-    if (error) return res.status(500).json({ msg: error.message });
-    res.json({ ok: true });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
+// ====== Admin APIs ======
+app.get("/api/admin/overview", requireAdmin, (req, res) => {
+  const db = req._db;
+  const orders = db.orders.slice(0, 200);
+  const topups = db.topups.slice(0, 200);
+  return res.json({ ok: true, orders, topups });
 });
 
-app.post("/api/admin/order-delete", requireAdmin, async (req, res) => {
-  try {
-    const id = Number(req.body.id);
-    const { error } = await sb.from("orders").delete().eq("id", id);
-    if (error) return res.status(500).json({ msg: error.message });
-    res.json({ ok: true });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
+app.post("/api/admin/order/update", requireAdmin, (req, res) => {
+  const { orderId, status, adminNote } = req.body || {};
+  const db = req._db;
+  const order = db.orders.find(o => o.id === String(orderId));
+  if (!order) return res.status(404).json({ ok: false, message: "Không tìm thấy đơn" });
+
+  const allowed = ["PENDING", "WORKING", "DONE", "CANCELLED"];
+  if (status && !allowed.includes(String(status))) return res.status(400).json({ ok: false, message: "Status không hợp lệ" });
+
+  if (status) order.status = String(status);
+  if (adminNote !== undefined) order.adminNote = String(adminNote);
+  order.updatedAt = nowISO();
+
+  writeDB(db);
+  return res.json({ ok: true, order });
 });
 
-// Duyệt nạp MB: approve => cộng balance + set topup "Đã duyệt"
-app.post("/api/admin/topup-approve", requireAdmin, async (req, res) => {
-  try {
-    const id = Number(req.body.id);
-    const approve = Boolean(req.body.approve);
+app.post("/api/admin/topup/approve", requireAdmin, (req, res) => {
+  const { topupId } = req.body || {};
+  const db = req._db;
+  const topup = db.topups.find(t => t.id === String(topupId));
+  if (!topup) return res.status(404).json({ ok: false, message: "Không tìm thấy topup" });
+  if (topup.status !== "WAITING") return res.status(400).json({ ok: false, message: "Topup không ở trạng thái chờ" });
 
-    const { data: topup, error: e1 } = await sb.from("topups").select("*").eq("id", id).maybeSingle();
-    if (e1) return res.status(500).json({ msg: e1.message });
-    if (!topup) return res.status(404).json({ msg: "Không tìm thấy topup" });
-    if (topup.status !== "Chờ duyệt") return res.status(400).json({ msg: "Topup đã xử lý rồi" });
+  const user = db.users.find(u => u.id === topup.userId);
+  if (!user) return res.status(404).json({ ok: false, message: "Không tìm thấy user" });
 
-    if (!approve) {
-      const { error: e2 } = await sb.from("topups").update({ status: "Từ chối" }).eq("id", id);
-      if (e2) return res.status(500).json({ msg: e2.message });
-      return res.json({ ok: true });
-    }
+  // Bank topup: bạn muốn cộng tay? => demo: admin duyệt thì cộng đúng amount
+  // Card topup: cộng "credit" đã trừ phí
+  const addMoney = topup.type === "CARD" ? Number(topup.credit || 0) : Number(topup.amount || 0);
 
-    const { data: user, error: eU } = await sb
-      .from("users")
-      .select("balance")
-      .eq("username", topup.username)
-      .maybeSingle();
-    if (eU) return res.status(500).json({ msg: eU.message });
-    if (!user) return res.status(404).json({ msg: "User không tồn tại" });
+  user.balance = Number(user.balance || 0) + addMoney;
+  topup.status = "APPROVED";
+  topup.updatedAt = nowISO();
+  topup.note = topup.note + ` | Admin duyệt cộng ${addMoney}đ`;
 
-    const newBal = Number(user.balance || 0) + Number(topup.amount || 0);
-
-    const { error: e3 } = await sb.from("users").update({ balance: newBal }).eq("username", topup.username);
-    if (e3) return res.status(500).json({ msg: e3.message });
-
-    const { error: e4 } = await sb.from("topups").update({ status: "Đã duyệt" }).eq("id", id);
-    if (e4) return res.status(500).json({ msg: e4.message });
-
-    res.json({ ok: true });
-  } catch {
-    res.status(500).json({ msg: "Lỗi server" });
-  }
+  writeDB(db);
+  return res.json({ ok: true, topup, balance: user.balance });
 });
 
-// Duyệt thẻ: approve => cộng net_amount + set card "Đã duyệt"
-app.post("/api/admin/card-approve", requireAdmin, async (req, res) => {
-  try {
-    const id = Number(req.body.id);
-    const approve = Boolean(req.body.approve);
-    const adminNote = normStr(req.body.adminNote);
+app.post("/api/admin/topup/reject", requireAdmin, (req, res) => {
+  const { topupId, note } = req.body || {};
+  const db = req._db;
+  const topup = db.topups.find(t => t.id === String(topupId));
+  if (!topup) return res.status(404).json({ ok: false, message: "Không tìm thấy topup" });
 
-    const { data: card, error: e1 } = await sb.from("card_topups").select("*").eq("id", id).maybeSingle();
-    if (e1) return res.status(500).json({ msg: e1.message });
-    if (!card) return res.status(404).json({ msg: "Không tìm thấy thẻ" });
-    if (card.status !== "Chờ duyệt") return res.status(400).json({ msg: "Thẻ đã xử lý rồi" });
+  topup.status = "REJECTED";
+  topup.updatedAt = nowISO();
+  topup.note = String(note || "Từ chối");
 
-    if (!approve) {
-      const { error: e2 } = awa
+  writeDB(db);
+  return res.json({ ok: true, topup });
+});
+
+// ====== Buy product by balance (đơn được trừ tiền) ======
+app.post("/api/orders/pay", requireUser, (req, res) => {
+  const { orderId } = req.body || {};
+  const db = req._db;
+  const order = db.orders.find(o => o.id === String(orderId) && o.userId === req.user.id);
+  if (!order) return res.status(404).json({ ok: false, message: "Không tìm thấy đơn" });
+
+  if (order.paid) return res.status(400).json({ ok: false, message: "Đơn đã thanh toán" });
+
+  const price = Number(order.price || 0);
+  if ((req.user.balance || 0) < price) {
+    return res.status(400).json({ ok: false, message: "Số dư không đủ. Hãy nạp tiền trước." });
+  }
+
+  req.user.balance -= price;
+  order.paid = true;
+  order.status = order.status === "PENDING" ? "WORKING" : order.status;
+  order.updatedAt = nowISO();
+
+  writeDB(db);
+  return res.json({ ok: true, message: "Thanh toán thành công", balance: req.user.balance, order });
+});
+
+// ====== Fallback route ======
+app.get("/", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Server running on port", PORT));
