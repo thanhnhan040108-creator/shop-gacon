@@ -1,7 +1,6 @@
 {
   "name": "shop-gacon",
   "version": "1.0.0",
-  "description": "Shop Ga Con - Node/Express + public static",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
