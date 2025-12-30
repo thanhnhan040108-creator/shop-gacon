@@ -1,101 +1,119 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Thanh toán - Shop Gà Con</title>
-  <link rel="stylesheet" href="app.css" />
+  <title>Thanh toán</title>
+  <link rel="stylesheet" href="/app.css" />
 </head>
-<body class="center">
-  <div class="card card-lg">
-    <div class="brand">
-      <div class="logo" id="logoTxt">MB</div>
-      <div>
-        <h2 id="pageTitle">Cổng thanh toán</h2>
-        <div class="muted">Quét QR và chuyển đúng nội dung</div>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <h1>Cổng thanh toán</h1>
+        <div class="sub">Chuyển khoản đúng nội dung để admin duyệt</div>
+      </div>
+      <div class="row">
+        <button class="btn" onclick="location.href='/home.html'">← Quay lại</button>
       </div>
     </div>
 
-    <div class="pay-grid">
-      <div class="pay-qr">
-        <img src="mb-qr.jpg" alt="MB QR" />
+    <div class="grid two">
+      <div class="card">
+        <div class="head"><h2>Thông tin đơn / nạp</h2></div>
+        <div class="body" id="info">Đang tải...</div>
       </div>
 
-      <div class="pay-info">
-        <div class="pill" id="typePill">Đơn</div>
-
-        <div class="pay-line"><span>Tài khoản:</span> <b id="pUser"></b></div>
-        <div class="pay-line" id="rowService" style="display:none"><span>Dịch vụ:</span> <b id="pService"></b></div>
-        <div class="pay-line" id="rowNote" style="display:none"><span>Ghi chú:</span> <b id="pNote"></b></div>
-        <div class="pay-line"><span>Số tiền:</span> <b id="pAmount"></b></div>
-        <div class="pay-line"><span>Phương thức:</span> <b id="pMethod">MB Bank</b></div>
-
-        <div class="pay-box">
-          <div class="muted">Nội dung chuyển khoản</div>
-          <div class="code" id="pCode"></div>
-          <div class="muted small">Chuyển đúng nội dung để admin duyệt nhanh.</div>
-        </div>
-
-        <div style="margin-top:12px; display:flex; gap:10px">
-          <button class="btn ghost" onclick="back()">Quay lại</button>
-          <button class="btn" onclick="copyCode()">Copy nội dung</button>
-        </div>
-
-        <div id="msg" class="msg"></div>
+      <div class="card">
+        <div class="head"><h2>QR MB Bank</h2></div>
+        <div class="body" id="bankBox">Đang tải...</div>
       </div>
     </div>
   </div>
 
+  <div class="toast" id="toast"><b id="tTitle">Thông báo</b><div id="tMsg" class="muted"></div></div>
+
 <script>
-  function formatVND(n){
-    n = Number(n||0);
-    return n.toLocaleString("vi-VN") + "đ";
+  const toast = (title, msg) => {
+    document.getElementById('tTitle').textContent = title;
+    document.getElementById('tMsg').textContent = msg || '';
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2600);
+  };
+  function fmtVND(n){
+    try { return new Intl.NumberFormat('vi-VN').format(n) + 'đ'; } catch(e){ return n + 'đ'; }
   }
-  function getType(){
-    const qs = new URLSearchParams(location.search);
-    return (qs.get("type") || "").toLowerCase();
+  function getToken(){ return localStorage.getItem('userToken') || ''; }
+  function requireLogin(){
+    if(!getToken()){ location.href='/index.html'; return false; }
+    return true;
   }
-
-  const type = getType(); // order | topup
-  const order = JSON.parse(localStorage.getItem("pay_order") || "null");
-  const topup = JSON.parse(localStorage.getItem("pay_topup") || "null");
-
-  if(type === "order"){
-    if(!order) location.href = "home.html";
-    logoTxt.textContent = "GC";
-    pageTitle.textContent = "Thanh toán đơn dịch vụ";
-    typePill.textContent = "Đơn hàng";
-
-    pUser.textContent = order.username || "";
-    rowService.style.display = "";
-    rowNote.style.display = "";
-
-    pService.textContent = order.service || "";
-    pNote.textContent = order.note || "(trống)";
-    pAmount.textContent = formatVND(order.price || 0);
-    pCode.textContent = order.payCode || "";
-  } else {
-    if(!topup) location.href = "home.html";
-    logoTxt.textContent = "MB";
-    pageTitle.textContent = "Thanh toán nạp tiền";
-    typePill.textContent = "Nạp tiền";
-
-    pUser.textContent = topup.username || "";
-    pAmount.textContent = formatVND(topup.amount || 0);
-    pMethod.textContent = topup.method || "MB Bank";
-    pCode.textContent = topup.code || "";
+  async function api(url){
+    const r = await fetch(url, { headers: { 'x-auth-token': getToken() }});
+    const j = await r.json().catch(()=>({ok:false,message:'JSON lỗi'}));
+    if(!r.ok) throw new Error(j.message || 'Request lỗi');
+    return j;
   }
 
-  function back(){ location.href = "home.html"; }
+  (async function init(){
+    if(!requireLogin()) return;
+    const q = new URLSearchParams(location.search);
+    const orderId = q.get('orderId');
+    const topupId = q.get('topupId');
 
-  async function copyCode(){
     try{
-      await navigator.clipboard.writeText(pCode.textContent);
-      msg.textContent = "Đã copy nội dung chuyển khoản.";
+      const j = await api(`/api/payment/info?orderId=${encodeURIComponent(orderId||'')}&topupId=${encodeURIComponent(topupId||'')}`);
+
+      const bank = j.bank;
+      const info = document.getElementById('info');
+      const bankBox = document.getElementById('bankBox');
+
+      let content = '';
+      let amount = 0;
+
+      if(j.order){
+        amount = Number(j.order.price||0);
+        content = `PAY_${j.order.id}`.slice(0, 18);
+        info.innerHTML = `
+          <div class="kv"><b>Thanh toán đơn hàng</b><span class="tag warn">${j.order.status}</span></div>
+          <div class="hr"></div>
+          <div><b>Dịch vụ:</b> ${j.order.serviceName}</div>
+          <div class="muted">${j.order.note || ''}</div>
+          <div class="hr"></div>
+          <div class="kv"><b>Số tiền</b><span>${fmtVND(amount)}</span></div>
+          <div class="kv"><b>Nội dung chuyển khoản</b><span>${content}</span></div>
+          <div class="muted" style="margin-top:8px">Sau khi chuyển khoản, admin sẽ kiểm tra và duyệt.</div>
+        `;
+      }else if(j.topup){
+        amount = Number(j.topup.amount||0);
+        content = j.topup.code || `NAP_${j.topup.id}`.slice(0, 18);
+        info.innerHTML = `
+          <div class="kv"><b>Nạp tiền (Bank)</b><span class="tag warn">${j.topup.status}</span></div>
+          <div class="hr"></div>
+          <div class="kv"><b>Số tiền</b><span>${fmtVND(amount)}</span></div>
+          <div class="kv"><b>Nội dung chuyển khoản</b><span>${content}</span></div>
+          <div class="muted" style="margin-top:8px">Chuyển khoản đúng nội dung để duyệt nhanh.</div>
+        `;
+      }else{
+        info.innerHTML = `<div class="muted">Không tìm thấy đơn/topup. Quay lại Home và tạo đơn hoặc tạo mã nạp.</div>`;
+      }
+
+      bankBox.innerHTML = `
+        <div class="kv"><b>Ngân hàng</b><span>${bank.name}</span></div>
+        <div class="kv"><b>Chủ TK</b><span>${bank.accountName}</span></div>
+        <div class="kv"><b>Số TK</b><span>${bank.accountNumber}</span></div>
+        <div class="hr"></div>
+        <img src="${bank.qrImage}" alt="QR MB" style="width:100%;max-width:420px;border-radius:16px;border:1px solid rgba(255,255,255,.12)" />
+        <div class="hr"></div>
+        <div class="muted">Gợi ý: copy nội dung chuyển khoản cho đúng.</div>
+      `;
     }catch(e){
-      msg.textContent = "Không copy được. Bạn tự copy: " + pCode.textContent;
+      toast('Lỗi', e.message);
+      document.getElementById('info').textContent = 'Lỗi: ' + e.message;
+      document.getElementById('bankBox').textContent = 'Lỗi: ' + e.message;
     }
-  }
+  })();
 </script>
 </body>
-</html>
+  </html>
