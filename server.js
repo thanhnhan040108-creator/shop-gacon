@@ -34,7 +34,7 @@ const SERVICES = [
     { key:"shark_anchor", name:"Shark Anchor", price:10000 },
     { key:"soul_guitar", name:"Soul Guitar", price:10000 },
     { key:"yoru_v3", name:"Yoru V3", price:20000 },
-    { key:"foxlamp", name:"Foxlamp | Yêu cầu full 4 tộc v3", price:15000 }
+    { key:"foxlamp", name:"Foxlamp | Yêu cầu cần 4 tộc v3", price:15000 }
   ]},
   { group: "LEVI", items: [
     { key:"tim_hydra", name:"Kéo tim về hydra", price:20000 },
@@ -396,4 +396,5 @@ app.post("/api/admin/topups/:id/reject", requireAdmin, (req, res) => {
 
 // ====== Start ======
 app.listen(PORT, () => console.log("Shop-Gacon running:", PORT));
+
 
