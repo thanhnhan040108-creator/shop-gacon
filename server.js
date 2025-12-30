@@ -1,56 +1,82 @@
+// server.js
 const express = require("express");
-const fs = require("fs");
 const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// ====== Paths ======
-const DATA_PATH = path.join(__dirname, "data.json");
+// ====== CONFIG ======
+const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, "data.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
 
-// ====== Helpers ======
+// Admin from Render Env
+const ADMIN_USER = (process.env.ADMIN_USER || "gacon").trim();
+const ADMIN_PASSWORDS = (process.env.ADMIN_PASSWORD || "1234")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
+
+// Token settings
+const TOKEN_SECRET = process.env.TOKEN_SECRET || "CHANGE_ME_TOKEN_SECRET";
+const TOKEN_TTL_MS = 1000 * 60 * 60 * 6; // 6h
+const ADMIN_TTL_MS = 1000 * 60 * 30;     // 30 phút
+
+// ====== Helpers: Data store ======
 function readDB() {
-  try {
-    if (!fs.existsSync(DATA_PATH)) {
-      fs.writeFileSync(
-        DATA_PATH,
-        JSON.stringify({ users: [], admins: [], orders: [], topups: [] }, null, 2),
-        "utf8"
-      );
-    }
-    const raw = fs.readFileSync(DATA_PATH, "utf8");
-    return JSON.parse(raw || "{}");
-  } catch (e) {
-    return { users: [], admins: [], orders: [], topups: [] };
+  if (!fs.existsSync(DATA_FILE)) {
+    const init = { users: [], orders: [], topups: [], adminLogs: [] };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(init, null, 2), "utf-8");
   }
+  const raw = fs.readFileSync(DATA_FILE, "utf-8");
+  return JSON.parse(raw || "{}");
 }
-
 function writeDB(db) {
-  fs.writeFileSync(DATA_PATH, JSON.stringify(db, null, 2), "utf8");
+  fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), "utf-8");
 }
-
-function uid(prefix = "id") {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+function id(prefix = "id") {
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
-
-function nowISO() {
-  return new Date().toISOString();
+function hashPassword(pw) {
+  // đơn giản (demo). Nếu muốn mạnh hơn -> bcrypt
+  return crypto.createHash("sha256").update(String(pw)).digest("hex");
 }
-
-// Basic token (demo): lưu localStorage phía client, server chỉ check khớp
-function makeToken(kind, id) {
-  return `${kind}.${id}.${Math.random().toString(36).slice(2)}.${Date.now().toString(36)}`;
+function signToken(payload, ttlMs) {
+  const exp = Date.now() + ttlMs;
+  const body = Buffer.from(JSON.stringify({ ...payload, exp })).toString("base64url");
+  const sig = crypto.createHmac("sha256", TOKEN_SECRET).update(body).digest("base64url");
+  return `${body}.${sig}`;
 }
-
-function feeForCard(amount) {
-  // Bạn yêu cầu:
-  // - Dưới 50k: chiết khấu 20%
-  // - Trên 100k: chiết khấu 15%
-  // - Còn lại: lấy 15%
-  if (amount < 50000) return 0.2;
-  return 0.15;
+function verifyToken(token) {
+  if (!token || typeof token !== "string" || !token.includes(".")) return null;
+  const [body, sig] = token.split(".");
+  const check = crypto.createHmac("sha256", TOKEN_SECRET).update(body).digest("base64url");
+  if (check !== sig) return null;
+  const data = JSON.parse(Buffer.from(body, "base64url").toString("utf-8"));
+  if (!data.exp || Date.now() > data.exp) return null;
+  return data;
+}
+function getBearer(req) {
+  const h = req.headers.authorization || "";
+  if (!h.startsWith("Bearer ")) return "";
+  return h.slice(7);
+}
+function requireUser(req, res, next) {
+  const token = getBearer(req);
+  const data = verifyToken(token);
+  if (!data || data.type !== "user") return res.status(401).json({ ok: false, message: "Chưa đăng nhập" });
+  req.userToken = data;
+  next();
+}
+function requireAdmin(req, res, next) {
+  const token = getBearer(req);
+  const data = verifyToken(token);
+  if (!data || data.type !== "admin") return res.status(401).json({ ok: false, message: "Chưa đăng nhập admin" });
+  req.adminToken = data;
+  next();
 }
 
 // ====== Services (VOCALA) ======
@@ -58,392 +84,355 @@ const SERVICES = [
   {
     group: "Combo Draco",
     items: [
-      { key: "combo_draco_100k", name: "Combo Draco", price: 100000, note: "" },
-      { key: "dai_10k", name: "Đai", price: 10000, note: "" },
-      { key: "sung_12k", name: "Súng", price: 12000, note: "" },
-      { key: "kiem_10k", name: "Kiếm", price: 10000, note: "" },
-      { key: "trung_rong_5k", name: "Trứng rồng", price: 5000, note: "" },
-      { key: "doc_rung_5k", name: "Độc rừng", price: 5000, note: "" }
-    ]
+      { key: "combo_draco", name: "Combo Draco", price: 100000 },
+      { key: "dai", name: "Đai", price: 10000 },
+      { key: "sung", name: "Súng", price: 12000 },
+      { key: "kiem", name: "Kiếm", price: 10000 },
+      { key: "trung_rong", name: "Trứng rồng", price: 5000 },
+      { key: "doc_rung", name: "Độc rừng", price: 5000 },
+    ],
   },
   {
     group: "ITEM",
     items: [
-      { key: "yama_5k", name: "Yama", price: 5000, note: "" },
-      { key: "tushita_5k", name: "Tushita", price: 5000, note: "" },
-      { key: "ghep_5k", name: "Ghép", price: 5000, note: "" },
-      { key: "az_cdk_15k", name: "A-Z CDK (bao all)", price: 15000, note: "" },
-      { key: "az_tt_20k", name: "A-Z TT (bao all)", price: 20000, note: "" },
-      { key: "shark_anchor_10k", name: "Shark Anchor", price: 10000, note: "" },
-      { key: "soul_guitar_10k", name: "Soul Guitar", price: 10000, note: "" },
-      { key: "yoru_v3_20k", name: "Yoru V3", price: 20000, note: "Yêu cầu full 4 tộc v3" },
-      { key: "foxlamp_15k", name: "Foxlamp", price: 15000, note: "" }
-    ]
+      { key: "yama", name: "Yama", price: 5000 },
+      { key: "tushita", name: "Tushita", price: 5000 },
+      { key: "ghep", name: "Ghép", price: 5000 },
+      { key: "cdk_az", name: "A-Z CDK (bao all)", price: 15000 },
+      { key: "tt_az", name: "A-Z TT (bao all)", price: 20000 },
+      { key: "shark_anchor", name: "Shark Anchor", price: 10000 },
+      { key: "soul_guitar", name: "Soul Guitar", price: 10000 },
+      { key: "yoru_v3", name: "Yoru V3", price: 20000 },
+      { key: "foxlamp", name: "Foxlamp (Yêu cầu full 4 tộc v3)", price: 15000 },
+    ],
   },
   {
     group: "LEVI",
     items: [
-      { key: "keo_hydra_20k", name: "Kéo tim về Hydra", price: 20000, note: "" },
-      { key: "keo_tiki_20k", name: "Kéo tim về Tiki", price: 20000, note: "" },
-      { key: "mele_mau_30k", name: "Mele máu", price: 30000, note: "" }
-    ]
+      { key: "keo_tim_hydra", name: "Kéo tim về hydra", price: 20000 },
+      { key: "keo_tim_tiki", name: "Kéo tim về tiki", price: 20000 },
+      { key: "mele_mau", name: "Mele máu", price: 30000 },
+    ],
   },
   {
-    group: "Ken và Mas",
+    group: "Ken và mas",
     items: [
-      { key: "haki_qs_v2_20k", name: "Haki quan sát V2", price: 20000, note: "" },
-      { key: "mas_1_600_5k", name: "1-600 mastery", price: 5000, note: "" }
-    ]
+      { key: "haki_qs_v2", name: "Haki quan sát V2", price: 20000 },
+      { key: "mas_1_600", name: "1-600 mas", price: 5000 },
+    ],
   },
   {
     group: "RAID / MELEE",
     items: [
-      { key: "lv_1_700_3k", name: "Cày level 1-700", price: 3000, note: "" },
-      { key: "lv_700_1500_8k", name: "Cày level 700-1500", price: 8000, note: "" },
-      { key: "lv_1500_max_15k", name: "Cày level 1500-max", price: 15000, note: "" },
-      { key: "lv_1_max_20k", name: "Cày level 1-max", price: 20000, note: "" },
-      { key: "gear_5k", name: "Gear", price: 5000, note: "" },
-      { key: "fg_20k", name: "FG", price: 20000, note: "" },
-      { key: "v1_v3_5k", name: "V1-v3", price: 5000, note: "" }
-    ]
+      { key: "lv_1_700", name: "1-700", price: 3000 },
+      { key: "lv_700_1500", name: "700-1500", price: 8000 },
+      { key: "lv_1500_max", name: "1500-max", price: 15000 },
+      { key: "lv_1_max", name: "1-max", price: 20000 },
+      { key: "gear", name: "Gear", price: 5000 },
+      { key: "fg", name: "FG", price: 20000 },
+      { key: "v1_v3", name: "V1-v3", price: 5000 },
+    ],
   },
   {
     group: "BELI / FRAG",
     items: [
-      { key: "beli_2m_1k", name: "2m beli", price: 1000, note: "" },
-      { key: "frag_2k_1k", name: "2k frag", price: 1000, note: "" }
-    ]
-  }
+      { key: "beli_2m", name: "2m beli", price: 1000 },
+      { key: "frag_2k", name: "2k frag", price: 1000 },
+    ],
+  },
 ];
 
-// ====== Static ======
+// ====== Serve static ======
 app.use(express.static(PUBLIC_DIR));
 
-// ====== Health ======
-app.get("/api/health", (req, res) => res.json({ ok: true, time: nowISO() }));
+// default route
+app.get("/", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "index.html")));
 
-// ====== Services ======
-app.get("/api/services", (req, res) => res.json({ ok: true, services: SERVICES }));
+// ====== API ======
 
-// ====== User Auth ======
-app.post("/api/auth/register", (req, res) => {
+// Services
+app.get("/api/services", (req, res) => {
+  res.json({ ok: true, services: SERVICES });
+});
+
+// Register / Login user
+app.post("/api/register", (req, res) => {
   const { username, password, email } = req.body || {};
-  if (!username || !password || !email) return res.status(400).json({ ok: false, message: "Thiếu username/password/email" });
-
+  if (!username || !password || !email) {
+    return res.status(400).json({ ok: false, message: "Thiếu username/password/email" });
+  }
   const db = readDB();
   const exists = db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase());
-  if (exists) return res.status(409).json({ ok: false, message: "Tên tài khoản đã tồn tại" });
+  if (exists) return res.status(400).json({ ok: false, message: "Username đã tồn tại" });
 
   const user = {
-    id: uid("u"),
-    username: String(username),
-    password: String(password),
-    email: String(email),
+    id: id("u"),
+    username: String(username).trim(),
+    email: String(email).trim(),
+    passHash: hashPassword(password),
     balance: 0,
-    createdAt: nowISO()
+    createdAt: Date.now(),
   };
   db.users.push(user);
   writeDB(db);
 
-  return res.json({ ok: true, message: "Tạo tài khoản thành công" });
+  const token = signToken({ type: "user", uid: user.id }, TOKEN_TTL_MS);
+  res.json({ ok: true, token, user: { id: user.id, username: user.username, email: user.email, balance: user.balance } });
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/login", (req, res) => {
   const { username, password } = req.body || {};
-  const db = readDB();
-  const user = db.users.find(
-    u => u.username.toLowerCase() === String(username || "").toLowerCase() && u.password === String(password || "")
-  );
-  if (!user) return res.status(401).json({ ok: false, message: "Sai tài khoản hoặc mật khẩu" });
+  if (!username || !password) return res.status(400).json({ ok: false, message: "Thiếu username/password" });
 
-  const token = makeToken("user", user.id);
-  return res.json({
-    ok: true,
-    token,
-    user: { id: user.id, username: user.username, email: user.email, balance: user.balance }
-  });
+  const db = readDB();
+  const user = db.users.find(u => u.username.toLowerCase() === String(username).toLowerCase());
+  if (!user) return res.status(400).json({ ok: false, message: "Sai tài khoản hoặc mật khẩu" });
+
+  if (user.passHash !== hashPassword(password)) {
+    return res.status(400).json({ ok: false, message: "Sai tài khoản hoặc mật khẩu" });
+  }
+
+  const token = signToken({ type: "user", uid: user.id }, TOKEN_TTL_MS);
+  res.json({ ok: true, token, user: { id: user.id, username: user.username, email: user.email, balance: user.balance } });
 });
 
-// reset password (demo) bằng email + username
-app.post("/api/auth/reset", (req, res) => {
+app.get("/api/me", requireUser, (req, res) => {
+  const db = readDB();
+  const user = db.users.find(u => u.id === req.userToken.uid);
+  if (!user) return res.status(401).json({ ok: false, message: "User không tồn tại" });
+  res.json({ ok: true, user: { id: user.id, username: user.username, email: user.email, balance: user.balance } });
+});
+
+// Forgot password (demo): verify by username+email then reset
+app.post("/api/reset-password", (req, res) => {
   const { username, email, newPassword } = req.body || {};
+  if (!username || !email || !newPassword) {
+    return res.status(400).json({ ok: false, message: "Thiếu username/email/newPassword" });
+  }
   const db = readDB();
   const user = db.users.find(
-    u => u.username.toLowerCase() === String(username || "").toLowerCase() && u.email.toLowerCase() === String(email || "").toLowerCase()
+    u => u.username.toLowerCase() === String(username).toLowerCase() && u.email.toLowerCase() === String(email).toLowerCase()
   );
-  if (!user) return res.status(404).json({ ok: false, message: "Không tìm thấy tài khoản khớp email" });
-  if (!newPassword) return res.status(400).json({ ok: false, message: "Thiếu mật khẩu mới" });
+  if (!user) return res.status(400).json({ ok: false, message: "Không khớp thông tin" });
 
-  user.password = String(newPassword);
+  user.passHash = hashPassword(newPassword);
   writeDB(db);
-  return res.json({ ok: true, message: "Đổi mật khẩu thành công" });
+  res.json({ ok: true, message: "Đổi mật khẩu thành công" });
 });
 
-// ====== Admin Auth ======
-app.post("/api/admin/login", (req, res) => {
-  const { username, password } = req.body || {};
-  const db = readDB();
-  const admin = db.admins.find(
-    a => a.username.toLowerCase() === String(username || "").toLowerCase() && a.password === String(password || "")
-  );
-  if (!admin) return res.status(401).json({ ok: false, message: "Sai admin hoặc mật khẩu" });
-
-  const token = makeToken("admin", admin.id);
-  return res.json({
-    ok: true,
-    token,
-    admin: { id: admin.id, username: admin.username, role: admin.role }
-  });
-});
-
-// ====== Middleware check tokens (demo) ======
-function requireUser(req, res, next) {
-  const token = req.headers["x-auth-token"];
-  const uidPart = String(token || "").split(".")[1];
-  const db = readDB();
-  const user = db.users.find(u => u.id === uidPart);
-  if (!token || !uidPart || !user) return res.status(401).json({ ok: false, message: "Chưa đăng nhập" });
-  req._db = db;
-  req.user = user;
-  req.token = token;
-  next();
-}
-
-function requireAdmin(req, res, next) {
-  const token = req.headers["x-admin-token"];
-  const aidPart = String(token || "").split(".")[1];
-  const db = readDB();
-  const admin = db.admins.find(a => a.id === aidPart);
-  if (!token || !aidPart || !admin) return res.status(401).json({ ok: false, message: "Chưa đăng nhập admin" });
-  req._db = db;
-  req.admin = admin;
-  req.token = token;
-  next();
-}
-
-// ====== Orders ======
-app.post("/api/orders/create", requireUser, (req, res) => {
+// Create order (spend balance)
+app.post("/api/orders", requireUser, (req, res) => {
   const { serviceKey, note } = req.body || {};
   if (!serviceKey) return res.status(400).json({ ok: false, message: "Thiếu serviceKey" });
 
-  let service = null;
+  const db = readDB();
+  const user = db.users.find(u => u.id === req.userToken.uid);
+  if (!user) return res.status(401).json({ ok: false, message: "User không tồn tại" });
+
+  // find service
+  let found = null;
   for (const g of SERVICES) {
-    const found = g.items.find(i => i.key === serviceKey);
-    if (found) { service = { ...found, group: g.group }; break; }
+    const it = g.items.find(x => x.key === serviceKey);
+    if (it) found = { ...it, group: g.group };
   }
-  if (!service) return res.status(404).json({ ok: false, message: "Không tìm thấy dịch vụ" });
+  if (!found) return res.status(400).json({ ok: false, message: "Dịch vụ không tồn tại" });
 
-  const db = req._db;
-  const order = {
-    id: uid("od"),
-    userId: req.user.id,
-    username: req.user.username,
-    serviceKey: service.key,
-    serviceName: service.name,
-    serviceGroup: service.group,
-    price: service.price,
-    note: String(note || ""),
-    status: "PENDING",
-    adminNote: "",
-    createdAt: nowISO(),
-    updatedAt: nowISO()
-  };
-
-  db.orders.unshift(order);
-  writeDB(db);
-  return res.json({ ok: true, order });
-});
-
-app.get("/api/history", requireUser, (req, res) => {
-  const db = req._db;
-  const orders = db.orders.filter(o => o.userId === req.user.id);
-  const topups = db.topups.filter(t => t.userId === req.user.id);
-  return res.json({ ok: true, user: { balance: req.user.balance }, orders, topups });
-});
-
-// ====== Topup (Bank: tạo mã nạp) ======
-app.post("/api/topup/bank/create", requireUser, (req, res) => {
-  const { method, amount } = req.body || {};
-  const amt = Number(amount);
-  if (!method) return res.status(400).json({ ok: false, message: "Thiếu method" });
-  if (!Number.isFinite(amt) || amt <= 0) return res.status(400).json({ ok: false, message: "Số tiền không hợp lệ" });
-
-  const db = req._db;
-  const code = `NAP_${uid("MB").toUpperCase()}`.replace(/[^A-Z0-9_]/g, "").slice(0, 18);
-
-  const topup = {
-    id: uid("tp"),
-    userId: req.user.id,
-    username: req.user.username,
-    type: "BANK",
-    method: String(method),
-    amount: amt,
-    feeRate: 0,
-    credit: 0,
-    code,
-    status: "WAITING",
-    note: "Chuyển khoản đúng nội dung để admin duyệt.",
-    createdAt: nowISO(),
-    updatedAt: nowISO()
-  };
-
-  db.topups.unshift(topup);
-  writeDB(db);
-  return res.json({ ok: true, topup });
-});
-
-// ====== Topup (Card) - demo: tạo yêu cầu, admin duyệt ======
-app.post("/api/topup/card/create", requireUser, (req, res) => {
-  const { telco, amount, serial, pin } = req.body || {};
-  const amt = Number(amount);
-
-  const allowedTelco = ["Viettel", "Mobifone", "Vinaphone", "Garena", "Zing"];
-  const allowedAmt = [20000, 50000, 100000, 200000, 500000];
-
-  if (!allowedTelco.includes(String(telco))) return res.status(400).json({ ok: false, message: "Nhà mạng không hợp lệ" });
-  if (!allowedAmt.includes(amt)) return res.status(400).json({ ok: false, message: "Mệnh giá không hợp lệ" });
-  if (!serial || !pin) return res.status(400).json({ ok: false, message: "Thiếu serial/mã thẻ" });
-
-  const db = req._db;
-  const feeRate = feeForCard(amt);
-  const credit = Math.floor(amt * (1 - feeRate));
-
-  const topup = {
-    id: uid("tp"),
-    userId: req.user.id,
-    username: req.user.username,
-    type: "CARD",
-    method: String(telco),
-    amount: amt,
-    feeRate,
-    credit,
-    serial: String(serial),
-    pin: String(pin),
-    status: "WAITING",
-    note: `Chiết khấu ${(feeRate * 100).toFixed(0)}% => cộng ${credit}đ sau duyệt`,
-    createdAt: nowISO(),
-    updatedAt: nowISO()
-  };
-
-  db.topups.unshift(topup);
-  writeDB(db);
-  return res.json({ ok: true, topup });
-});
-
-// ====== Payment page data ======
-app.get("/api/payment/info", requireUser, (req, res) => {
-  const { orderId, topupId } = req.query || {};
-  const db = req._db;
-
-  let order = null;
-  let topup = null;
-
-  if (orderId) order = db.orders.find(o => o.id === String(orderId) && o.userId === req.user.id) || null;
-  if (topupId) topup = db.topups.find(t => t.id === String(topupId) && t.userId === req.user.id) || null;
-
-  return res.json({
-    ok: true,
-    bank: {
-      name: "MB Bank",
-      accountName: "VAN VIET THANH NHAN",
-      // Số tài khoản bạn đã dùng trong ảnh (mình không tự bịa thêm, bạn có thể đổi)
-      accountNumber: "7475040109",
-      qrImage: "/mb-qr.jpg"
-    },
-    order,
-    topup
-  });
-});
-
-// ====== Admin APIs ======
-app.get("/api/admin/overview", requireAdmin, (req, res) => {
-  const db = req._db;
-  const orders = db.orders.slice(0, 200);
-  const topups = db.topups.slice(0, 200);
-  return res.json({ ok: true, orders, topups });
-});
-
-app.post("/api/admin/order/update", requireAdmin, (req, res) => {
-  const { orderId, status, adminNote } = req.body || {};
-  const db = req._db;
-  const order = db.orders.find(o => o.id === String(orderId));
-  if (!order) return res.status(404).json({ ok: false, message: "Không tìm thấy đơn" });
-
-  const allowed = ["PENDING", "WORKING", "DONE", "CANCELLED"];
-  if (status && !allowed.includes(String(status))) return res.status(400).json({ ok: false, message: "Status không hợp lệ" });
-
-  if (status) order.status = String(status);
-  if (adminNote !== undefined) order.adminNote = String(adminNote);
-  order.updatedAt = nowISO();
-
-  writeDB(db);
-  return res.json({ ok: true, order });
-});
-
-app.post("/api/admin/topup/approve", requireAdmin, (req, res) => {
-  const { topupId } = req.body || {};
-  const db = req._db;
-  const topup = db.topups.find(t => t.id === String(topupId));
-  if (!topup) return res.status(404).json({ ok: false, message: "Không tìm thấy topup" });
-  if (topup.status !== "WAITING") return res.status(400).json({ ok: false, message: "Topup không ở trạng thái chờ" });
-
-  const user = db.users.find(u => u.id === topup.userId);
-  if (!user) return res.status(404).json({ ok: false, message: "Không tìm thấy user" });
-
-  // Bank topup: bạn muốn cộng tay? => demo: admin duyệt thì cộng đúng amount
-  // Card topup: cộng "credit" đã trừ phí
-  const addMoney = topup.type === "CARD" ? Number(topup.credit || 0) : Number(topup.amount || 0);
-
-  user.balance = Number(user.balance || 0) + addMoney;
-  topup.status = "APPROVED";
-  topup.updatedAt = nowISO();
-  topup.note = topup.note + ` | Admin duyệt cộng ${addMoney}đ`;
-
-  writeDB(db);
-  return res.json({ ok: true, topup, balance: user.balance });
-});
-
-app.post("/api/admin/topup/reject", requireAdmin, (req, res) => {
-  const { topupId, note } = req.body || {};
-  const db = req._db;
-  const topup = db.topups.find(t => t.id === String(topupId));
-  if (!topup) return res.status(404).json({ ok: false, message: "Không tìm thấy topup" });
-
-  topup.status = "REJECTED";
-  topup.updatedAt = nowISO();
-  topup.note = String(note || "Từ chối");
-
-  writeDB(db);
-  return res.json({ ok: true, topup });
-});
-
-// ====== Buy product by balance (đơn được trừ tiền) ======
-app.post("/api/orders/pay", requireUser, (req, res) => {
-  const { orderId } = req.body || {};
-  const db = req._db;
-  const order = db.orders.find(o => o.id === String(orderId) && o.userId === req.user.id);
-  if (!order) return res.status(404).json({ ok: false, message: "Không tìm thấy đơn" });
-
-  if (order.paid) return res.status(400).json({ ok: false, message: "Đơn đã thanh toán" });
-
-  const price = Number(order.price || 0);
-  if ((req.user.balance || 0) < price) {
+  if (user.balance < found.price) {
     return res.status(400).json({ ok: false, message: "Số dư không đủ. Hãy nạp tiền trước." });
   }
 
-  req.user.balance -= price;
-  order.paid = true;
-  order.status = order.status === "PENDING" ? "WORKING" : order.status;
-  order.updatedAt = nowISO();
+  user.balance -= found.price;
+
+  const order = {
+    id: id("od"),
+    uid: user.id,
+    username: user.username,
+    serviceKey: found.key,
+    serviceName: found.name,
+    group: found.group,
+    price: found.price,
+    note: String(note || "").trim(),
+    status: "Đã tạo",
+    createdAt: Date.now(),
+  };
+  db.orders.unshift(order);
+  writeDB(db);
+
+  res.json({ ok: true, order, balance: user.balance });
+});
+
+app.get("/api/history", requireUser, (req, res) => {
+  const db = readDB();
+  const orders = db.orders.filter(o => o.uid === req.userToken.uid);
+  const topups = db.topups.filter(t => t.uid === req.userToken.uid);
+  res.json({ ok: true, orders, topups });
+});
+
+// Create MB topup request: generate code NAP_xxx
+app.post("/api/topup/mb", requireUser, (req, res) => {
+  const { amount } = req.body || {};
+  const n = Number(amount);
+  if (!n || n < 1000) return res.status(400).json({ ok: false, message: "Số tiền không hợp lệ" });
+
+  const db = readDB();
+  const user = db.users.find(u => u.id === req.userToken.uid);
+  if (!user) return res.status(401).json({ ok: false, message: "User không tồn tại" });
+
+  const code = `NAP_${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+  const topup = {
+    id: id("tp"),
+    uid: user.id,
+    username: user.username,
+    method: "MB Bank",
+    amount: n,
+    fee: 0,
+    total: n,
+    code,
+    status: "Chờ duyệt",
+    createdAt: Date.now(),
+  };
+  db.topups.unshift(topup);
+  writeDB(db);
+
+  res.json({ ok: true, topup });
+});
+
+// Card topup request (Vinaphone/Mobiphone/Viettel/Garena/Zing)
+// Fee rules: < 50k => 20% ; >= 100k => 15% ; else 15% (bạn muốn “chung 15%”, mình áp 20% khi <50k, 15% khi >=100k)
+app.post("/api/topup/card", requireUser, (req, res) => {
+  const { telco, value, serial, pin } = req.body || {};
+  const allowed = ["Vinaphone", "Mobiphone", "Viettel", "Garena", "Zing"];
+  if (!allowed.includes(String(telco))) return res.status(400).json({ ok: false, message: "Nhà mạng không hợp lệ" });
+
+  const v = Number(value);
+  const valuesAllowed = [20000, 50000, 100000, 200000, 500000];
+  if (!valuesAllowed.includes(v)) return res.status(400).json({ ok: false, message: "Mệnh giá không hợp lệ" });
+
+  if (!serial || !pin) return res.status(400).json({ ok: false, message: "Thiếu serial hoặc mã thẻ" });
+
+  const db = readDB();
+  const user = db.users.find(u => u.id === req.userToken.uid);
+  if (!user) return res.status(401).json({ ok: false, message: "User không tồn tại" });
+
+  let feeRate = 0.15;
+  if (v < 50000) feeRate = 0.20;
+  if (v >= 100000) feeRate = 0.15;
+
+  const fee = Math.round(v * feeRate);
+  const received = v - fee;
+
+  const topup = {
+    id: id("tp"),
+    uid: user.id,
+    username: user.username,
+    method: `Card ${telco}`,
+    amount: v,
+    fee,
+    total: received,
+    code: `CARD_${crypto.randomBytes(3).toString("hex").toUpperCase()}`,
+    card: { telco, value: v, serial: String(serial).trim(), pin: String(pin).trim() },
+    status: "Chờ duyệt",
+    createdAt: Date.now(),
+  };
+  db.topups.unshift(topup);
+  writeDB(db);
+
+  res.json({ ok: true, topup });
+});
+
+// Payment info for a topup id
+app.get("/api/topup/:id", requireUser, (req, res) => {
+  const db = readDB();
+  const topup = db.topups.find(t => t.id === req.params.id && t.uid === req.userToken.uid);
+  if (!topup) return res.status(404).json({ ok: false, message: "Không tìm thấy yêu cầu nạp" });
+  res.json({ ok: true, topup });
+});
+
+// ====== ADMIN ======
+app.post("/api/admin/login", (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) return res.status(400).json({ ok: false, message: "Thiếu username/password" });
+
+  const uok = String(username).trim() === ADMIN_USER;
+  const pok = ADMIN_PASSWORDS.includes(String(password).trim());
+  if (!uok || !pok) return res.status(401).json({ ok: false, message: "Sai admin" });
+
+  const token = signToken({ type: "admin", role: "admin", name: ADMIN_USER }, ADMIN_TTL_MS);
+  res.json({ ok: true, token, admin: { username: ADMIN_USER, role: "admin", ttlMinutes: 30 } });
+});
+
+app.get("/api/admin/summary", requireAdmin, (req, res) => {
+  const db = readDB();
+  const pendingTopups = db.topups.filter(t => t.status === "Chờ duyệt").length;
+  const pendingOrders = db.orders.filter(o => o.status === "Đã tạo").length;
+  res.json({ ok: true, pendingTopups, pendingOrders, totalUsers: db.users.length });
+});
+
+app.get("/api/admin/topups", requireAdmin, (req, res) => {
+  const db = readDB();
+  res.json({ ok: true, topups: db.topups });
+});
+
+app.post("/api/admin/topups/:id/approve", requireAdmin, (req, res) => {
+  const db = readDB();
+  const topup = db.topups.find(t => t.id === req.params.id);
+  if (!topup) return res.status(404).json({ ok: false, message: "Không tìm thấy topup" });
+  if (topup.status === "Đã duyệt") return res.json({ ok: true, topup });
+
+  const user = db.users.find(u => u.id === topup.uid);
+  if (!user) return res.status(404).json({ ok: false, message: "Không tìm thấy user" });
+
+  // cộng số tiền thực nhận (total)
+  user.balance += Number(topup.total || 0);
+  topup.status = "Đã duyệt";
+  topup.approvedAt = Date.now();
 
   writeDB(db);
-  return res.json({ ok: true, message: "Thanh toán thành công", balance: req.user.balance, order });
+  res.json({ ok: true, topup, balance: user.balance });
 });
 
-// ====== Fallback route ======
-app.get("/", (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+app.post("/api/admin/topups/:id/reject", requireAdmin, (req, res) => {
+  const { reason } = req.body || {};
+  const db = readDB();
+  const topup = db.topups.find(t => t.id === req.params.id);
+  if (!topup) return res.status(404).json({ ok: false, message: "Không tìm thấy topup" });
+
+  topup.status = "Từ chối";
+  topup.reason = String(reason || "").trim();
+  topup.rejectedAt = Date.now();
+
+  writeDB(db);
+  res.json({ ok: true, topup });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on port", PORT));
+app.get("/api/admin/orders", requireAdmin, (req, res) => {
+  const db = readDB();
+  res.json({ ok: true, orders: db.orders });
+});
+
+app.post("/api/admin/orders/:id/status", requireAdmin, (req, res) => {
+  const { status } = req.body || {};
+  const allowed = ["Đã tạo", "Đang làm", "Hoàn thành", "Hủy"];
+  if (!allowed.includes(String(status))) return res.status(400).json({ ok: false, message: "Status không hợp lệ" });
+
+  const db = readDB();
+  const order = db.orders.find(o => o.id === req.params.id);
+  if (!order) return res.status(404).json({ ok: false, message: "Không tìm thấy đơn" });
+
+  order.status = String(status);
+  order.updatedAt = Date.now();
+  writeDB(db);
+
+  res.json({ ok: true, order });
+});
+
+// ====== FALLBACK routes ======
+app.get("/home", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "home.html")));
+app.get("/admin", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "admin.html")));
+app.get("/admin-dashboard", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "admin-dashboard.html")));
+app.get("/payment", (req, res) => res.sendFile(path.join(PUBLIC_DIR, "payment.html")));
+
+// ====== START ======
+app.listen(PORT, () => {
+  console.log("Shop server running on port", PORT);
+});
