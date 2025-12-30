@@ -4,185 +4,142 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin Dashboard</title>
-  <link rel="stylesheet" href="/app.css" />
+  <link rel="stylesheet" href="/public/app.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="topbar">
-      <div class="brand">
-        <h1>Admin Dashboard</h1>
-        <div class="sub" id="me">Xin chào admin</div>
-      </div>
-      <div class="row">
-        <button class="btn" onclick="location.href='/home.html'">Home</button>
-        <button class="btn danger" onclick="logout()">Logout</button>
-      </div>
+  <div class="topbar">
+    <div>
+      <div class="brand">Admin Dashboard</div>
+      <div class="muted" id="who">...</div>
     </div>
-
-    <div class="grid two">
-      <div class="card">
-        <div class="head">
-          <h2>Đơn hàng (mới nhất)</h2>
-          <button class="btn small" onclick="loadAll()">Tải lại</button>
-        </div>
-        <div class="body" id="orders">Đang tải...</div>
-      </div>
-
-      <div class="card">
-        <div class="head">
-          <h2>Nạp tiền (chờ duyệt)</h2>
-          <button class="btn small" onclick="loadAll()">Tải lại</button>
-        </div>
-        <div class="body" id="topups">Đang tải...</div>
-      </div>
+    <div class="row">
+      <button class="btn" id="reload">Tải lại</button>
+      <button class="btn" id="logout">Đăng xuất</button>
     </div>
   </div>
 
-  <div class="toast" id="toast"><b id="tTitle">Thông báo</b><div id="tMsg" class="muted"></div></div>
+  <div class="container">
+    <div class="card">
+      <h2>Topup chờ duyệt</h2>
+      <div id="topups" class="muted">...</div>
+    </div>
+
+    <div class="card">
+      <h2>Đơn hàng</h2>
+      <div id="orders" class="muted">...</div>
+    </div>
+  </div>
 
 <script>
-  const toast = (title, msg) => {
-    document.getElementById('tTitle').textContent = title;
-    document.getElementById('tMsg').textContent = msg || '';
-    const t = document.getElementById('toast');
-    t.classList.add('show');
-    setTimeout(()=>t.classList.remove('show'), 2600);
-  };
+const $ = (id)=>document.getElementById(id);
+function money(n){ return (Number(n)||0).toLocaleString("vi-VN"); }
 
-  function getAdminToken(){ return localStorage.getItem('adminToken') || ''; }
-  function requireAdmin(){
-    if(!getAdminToken()){ location.href='/admin.html'; return false; }
-    return true;
+async function get(url){
+  const r = await fetch(url);
+  const j = await r.json().catch(()=>({ok:false}));
+  if(!r.ok) throw new Error(j.message || "Request lỗi");
+  return j;
+}
+async function post(url, body){
+  const r = await fetch(url, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(body || {})
+  });
+  const j = await r.json().catch(()=>({ok:false,message:"Lỗi JSON"}));
+  if(!r.ok) throw new Error(j.message || "Request lỗi");
+  return j;
+}
+
+async function loadMe(){
+  try{
+    const me = await get("/api/admin/me");
+    $("who").textContent = `Xin chào: ${me.admin.username} • role: ${me.admin.role}`;
+  }catch(e){
+    location.href="/admin";
   }
-  function logout(){
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminInfo');
-    location.href='/admin.html';
-  }
-  async function api(url, opts={}){
-    opts.headers = Object.assign({}, opts.headers || {}, {
-      'Content-Type':'application/json',
-      'x-admin-token': getAdminToken()
-    });
-    const r = await fetch(url, opts);
-    const j = await r.json().catch(()=>({ok:false,message:'JSON lỗi'}));
-    if(!r.ok) throw new Error(j.message || 'Request lỗi');
-    return j;
-  }
-  function fmtVND(n){
-    try { return new Intl.NumberFormat('vi-VN').format(n) + 'đ'; } catch(e){ return n + 'đ'; }
-  }
+}
 
-  function statusSelectHTML(id, current){
-    const opts = ["PENDING","WORKING","DONE","CANCELLED"].map(s=>{
-      const sel = (s===current) ? "selected" : "";
-      return `<option ${sel}>${s}</option>`;
-    }).join('');
-    return `<select class="input" data-status="${id}">${opts}</select>`;
-  }
+async function loadTopups(){
+  const r = await get("/api/admin/topups");
+  const list = r.topups || [];
+  const pend = list.filter(t => t.status === "Chờ duyệt");
 
-  async function updateOrder(id){
-    const sel = document.querySelector(`select[data-status="${id}"]`);
-    const note = document.querySelector(`textarea[data-onote="${id}"]`);
-    const status = sel ? sel.value : "PENDING";
-    const adminNote = note ? note.value : "";
-    try{
-      await api('/api/admin/order/update', {
-        method:'POST',
-        body: JSON.stringify({ orderId:id, status, adminNote })
-      });
-      toast('OK', 'Đã cập nhật đơn');
-      await loadAll();
-    }catch(e){
-      toast('Lỗi', e.message);
-    }
-  }
+  $("topups").innerHTML = pend.length ? pend.map(t=>`
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <b>${t.method}</b>
+        <span class="badge">${t.status}</span>
+      </div>
+      <div class="muted">User: <b>${t.username}</b></div>
+      <div class="muted">Mã: <b>${t.code}</b> • Gửi: ${money(t.amount)}đ • Nhận: ${money(t.total)}đ</div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" onclick="approve('${t.id}')">Duyệt</button>
+        <button class="btn" onclick="reject('${t.id}')">Từ chối</button>
+      </div>
+    </div>
+  `).join("") : `<div class="muted">Không có topup chờ duyệt.</div>`;
+}
 
-  async function approveTopup(id){
-    try{
-      await api('/api/admin/topup/approve', { method:'POST', body: JSON.stringify({ topupId:id }) });
-      toast('OK', 'Đã duyệt nạp');
-      await loadAll();
-    }catch(e){
-      toast('Lỗi', e.message);
-    }
-  }
+async function loadOrders(){
+  const r = await get("/api/admin/orders");
+  const list = r.orders || [];
+  $("orders").innerHTML = list.length ? list.map(o=>`
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <b>${o.serviceName}</b>
+        <span class="badge">${o.status}</span>
+      </div>
+      <div class="muted">User: <b>${o.username}</b> • Mã: <b>${o.id}</b> • ${money(o.price)}đ</div>
+      <div class="muted">Ghi chú: ${o.note ? o.note.replaceAll("<","&lt;") : "(không có)"}</div>
+      <div class="row" style="margin-top:10px">
+        <select class="input" id="st_${o.id}" style="max-width:260px">
+          <option ${o.status==="Đã tạo"?"selected":""}>Đã tạo</option>
+          <option ${o.status==="Đang làm"?"selected":""}>Đang làm</option>
+          <option ${o.status==="Hoàn thành"?"selected":""}>Hoàn thành</option>
+          <option ${o.status==="Hủy"?"selected":""}>Hủy</option>
+        </select>
+        <button class="btn primary" onclick="setStatus('${o.id}')">Cập nhật</button>
+      </div>
+    </div>
+  `).join("") : `<div class="muted">Chưa có đơn.</div>`;
+}
 
-  async function rejectTopup(id){
-    const note = prompt("Lý do từ chối?") || "Từ chối";
-    try{
-      await api('/api/admin/topup/reject', { method:'POST', body: JSON.stringify({ topupId:id, note }) });
-      toast('OK', 'Đã từ chối');
-      await loadAll();
-    }catch(e){
-      toast('Lỗi', e.message);
-    }
-  }
+window.approve = async (id)=>{
+  try{
+    await post(`/api/admin/topups/${id}/approve`, {});
+    await loadTopups();
+  }catch(e){ alert(e.message); }
+};
+window.reject = async (id)=>{
+  const reason = prompt("Lý do từ chối?") || "";
+  try{
+    await post(`/api/admin/topups/${id}/reject`, { reason });
+    await loadTopups();
+  }catch(e){ alert(e.message); }
+};
+window.setStatus = async (id)=>{
+  const st = document.getElementById("st_"+id).value;
+  try{
+    await post(`/api/admin/orders/${id}/status`, { status: st });
+    await loadOrders();
+  }catch(e){ alert(e.message); }
+};
 
-  async function loadAll(){
-    if(!requireAdmin()) return;
-    const me = JSON.parse(localStorage.getItem('adminInfo')||'{}');
-    document.getElementById('me').textContent = `Xin chào ${me.username || 'admin'} • role: ${me.role || ''}`;
+$("reload").onclick = async ()=>{
+  await loadTopups();
+  await loadOrders();
+};
+$("logout").onclick = async ()=>{
+  await post("/api/admin/logout", {});
+  location.href="/admin";
+};
 
-    const j = await api('/api/admin/overview', { method:'GET' });
-
-    const orders = j.orders || [];
-    const topups = j.topups || [];
-
-    // Orders
-    const o = document.getElementById('orders');
-    if(!orders.length) o.innerHTML = `<div class="muted">Chưa có đơn.</div>`;
-    else{
-      let html = '';
-      orders.slice(0, 60).forEach(x=>{
-        html += `
-          <div class="serviceGroup" style="margin-bottom:12px">
-            <div class="kv">
-              <b>${x.serviceName}</b>
-              <span>${fmtVND(x.price)} • ${x.username}</span>
-            </div>
-            <div class="muted" style="margin-top:8px">${x.note || ''}</div>
-            <div class="hr"></div>
-            <div class="label">Trạng thái</div>
-            ${statusSelectHTML(x.id, x.status)}
-            <div class="label">Ghi chú admin</div>
-            <textarea class="input" data-onote="${x.id}" placeholder="Ghi chú..." style="min-height:52px">${x.adminNote || ''}</textarea>
-            <div class="row" style="margin-top:10px">
-              <button class="btn primary" onclick="updateOrder('${x.id}')">Lưu</button>
-              <span class="muted">#${x.id}</span>
-            </div>
-          </div>
-        `;
-      });
-      o.innerHTML = html;
-    }
-
-    // Topups
-    const t = document.getElementById('topups');
-    const waiting = topups.filter(x=>x.status==="WAITING").slice(0, 80);
-    if(!waiting.length) t.innerHTML = `<div class="muted">Không có nạp chờ duyệt.</div>`;
-    else{
-      let html = '';
-      waiting.forEach(x=>{
-        html += `
-          <div class="serviceGroup" style="margin-bottom:12px">
-            <div class="kv"><b>${x.type} • ${x.method}</b><span>${fmtVND(x.amount)} • ${x.username}</span></div>
-            <div class="muted" style="margin-top:8px">${x.code ? ('Nội dung: ' + x.code) : ''}</div>
-            <div class="muted">${x.note || ''}</div>
-            ${x.type==="CARD" ? `<div class="muted">Serial: ${x.serial} • PIN: ${x.pin}</div>` : ''}
-            <div class="row" style="margin-top:10px">
-              <button class="btn primary" onclick="approveTopup('${x.id}')">Duyệt</button>
-              <button class="btn danger" onclick="rejectTopup('${x.id}')">Từ chối</button>
-              <span class="muted">#${x.id}</span>
-            </div>
-          </div>
-        `;
-      });
-      t.innerHTML = html;
-    }
-  }
-
-  loadAll().catch(e=>toast('Lỗi', e.message));
+(async ()=>{
+  await loadMe();
+  await loadTopups();
+  await loadOrders();
+})();
 </script>
 </body>
-</html>
+  </html>
