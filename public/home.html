@@ -1,313 +1,226 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Shop Gà Con - Home</title>
-  <link rel="stylesheet" href="app.css"/>
-  <style>
-    .fab-msg{
-      position:fixed; right:16px; bottom:16px;
-      width:54px; height:54px; border-radius:999px;
-      display:grid; place-items:center;
-      background:linear-gradient(135deg,#3b82f6,#8b5cf6);
-      box-shadow:0 10px 30px rgba(0,0,0,.35);
-      color:#fff; text-decoration:none; font-size:22px;
-      z-index:50;
-    }
-    .row{display:flex; gap:12px; flex-wrap:wrap}
-    .grow{flex:1}
-    .badge{display:inline-block; padding:4px 10px; border-radius:999px; background:#0b1220; border:1px solid rgba(255,255,255,.08); color:#cbd5e1; font-size:12px}
-    .price{font-weight:700}
-    .muted{color:#93a4bd}
-    .divider{height:1px; background:rgba(255,255,255,.07); margin:14px 0}
-    .grid2{display:grid; grid-template-columns:1fr; gap:12px}
-    @media(min-width:860px){ .grid2{grid-template-columns:1fr 1fr} }
-    textarea{min-height:52px; resize:vertical}
-    .serviceItem{display:flex; gap:10px; align-items:flex-start; justify-content:space-between}
-    .serviceLeft{flex:1}
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Home - Shop Gà Con</title>
+  <link rel="stylesheet" href="/public/app.css" />
 </head>
 <body>
-  <div class="appShell">
-    <header class="topbar">
-      <div>
-        <div class="brand">Shop Gà Con</div>
-        <div class="muted" id="hello">...</div>
-      </div>
-      <div class="row">
-        <span class="badge">Số dư: <b id="balance">0</b>đ</span>
-        <button class="btn" id="btnLogout">Đăng xuất</button>
-      </div>
-    </header>
-
-    <main class="container">
-      <section class="card">
-        <h2>Dịch vụ VOCALA</h2>
-        <p class="muted">Chọn dịch vụ → ghi chú (acc/mk/yêu cầu) → tạo đơn. Trạng thái nằm ở mục “Lịch sử”.</p>
-        <div class="divider"></div>
-        <div id="services"></div>
-      </section>
-
-      <section class="card">
-        <h2>Nạp tiền</h2>
-        <p class="muted">Bạn có thể nạp bằng <b>MB Bank</b> hoặc <b>thẻ cào</b>. Admin duyệt xong sẽ cộng số dư.</p>
-
-        <div class="divider"></div>
-
-        <div class="grid2">
-          <!-- MB -->
-          <div class="card" style="background:rgba(255,255,255,.02)">
-            <h3>MB Bank (QR / chuyển khoản)</h3>
-            <div class="row">
-              <input class="grow" id="mbAmount" type="number" min="1000" placeholder="Số tiền (VND)"/>
-              <button class="btn" id="btnMb">Tạo mã nạp</button>
-            </div>
-            <p class="muted" id="mbResult"></p>
-          </div>
-
-          <!-- Card -->
-          <div class="card" style="background:rgba(255,255,255,.02)">
-            <h3>Thẻ cào (Vinaphone/Mobiphone/Viettel/Garena/Zing)</h3>
-            <div class="row">
-              <select id="telco" class="grow">
-                <option>Vinaphone</option>
-                <option>Mobiphone</option>
-                <option>Viettel</option>
-                <option>Garena</option>
-                <option>Zing</option>
-              </select>
-              <select id="cardValue">
-                <option value="20000">20k</option>
-                <option value="50000">50k</option>
-                <option value="100000">100k</option>
-                <option value="200000">200k</option>
-                <option value="500000">500k</option>
-              </select>
-            </div>
-            <div class="row" style="margin-top:10px">
-              <input class="grow" id="serial" placeholder="Serial"/>
-              <input class="grow" id="pin" placeholder="Mã thẻ"/>
-            </div>
-            <p class="muted" style="margin-top:10px">
-              Phí: <b>20%</b> nếu &lt; 50k, <b>15%</b> nếu ≥ 100k.
-            </p>
-            <button class="btn" id="btnCard">Gửi thẻ</button>
-            <p class="muted" id="cardResult"></p>
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>Lịch sử</h2>
-        <div class="row">
-          <button class="btn" id="btnReload">Tải lại</button>
-          <span class="muted" id="loading"></span>
-        </div>
-        <div class="divider"></div>
-        <div id="history"></div>
-      </section>
-    </main>
+  <div class="topbar">
+    <div>
+      <div class="brand">Home</div>
+      <div class="muted" id="hello">...</div>
+    </div>
+    <div class="row">
+      <span class="badge">Số dư: <b id="bal">0</b>đ</span>
+      <button class="btn" id="logout">Đăng xuất</button>
+    </div>
   </div>
 
-  <!-- Message icon -->
-  <a class="fab-msg" href="https://www.facebook.com/share/1ajgzqUGdh/" target="_blank" rel="noopener">💬</a>
+  <div class="container">
+    <div class="card">
+      <h2>Dịch vụ VOCALA</h2>
+      <div class="muted">Chọn dịch vụ → ghi chú → tạo đơn (trừ số dư).</div>
+      <hr>
+      <div id="services"></div>
+    </div>
+
+    <div class="card">
+      <h2>Nạp tiền</h2>
+      <div class="grid2">
+        <div class="card">
+          <h3>MB Bank</h3>
+          <div class="row">
+            <input class="input" id="mbAmount" type="number" min="1000" placeholder="Số tiền">
+            <button class="btn primary" id="mbCreate">Tạo mã nạp</button>
+          </div>
+          <div class="muted" id="mbMsg" style="margin-top:10px"></div>
+        </div>
+
+        <div class="card">
+          <h3>Thẻ cào</h3>
+          <div class="row">
+            <select class="input" id="telco">
+              <option>Vinaphone</option>
+              <option>Mobiphone</option>
+              <option>Viettel</option>
+              <option>Garena</option>
+              <option>Zing</option>
+            </select>
+            <select class="input" id="value">
+              <option value="20000">20k</option>
+              <option value="50000">50k</option>
+              <option value="100000">100k</option>
+              <option value="200000">200k</option>
+              <option value="500000">500k</option>
+            </select>
+          </div>
+          <div class="row">
+            <input class="input" id="serial" placeholder="Serial">
+            <input class="input" id="pin" placeholder="Mã thẻ">
+          </div>
+          <button class="btn primary" id="cardSend">Gửi thẻ</button>
+          <div class="muted" id="cardMsg" style="margin-top:10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Lịch sử</h2>
+      <button class="btn" id="reload">Tải lại</button>
+      <hr>
+      <div id="history"></div>
+    </div>
+  </div>
 
 <script>
-  const API = "";
-  const token = localStorage.getItem("token") || "";
+const $ = (id)=>document.getElementById(id);
+function money(n){ return (Number(n)||0).toLocaleString("vi-VN"); }
 
-  function money(n){
-    try { return (Number(n)||0).toLocaleString("vi-VN"); } catch(e){ return n; }
-  }
+async function get(url){
+  const r = await fetch(url);
+  const j = await r.json().catch(()=>({ok:false}));
+  if(!r.ok) throw new Error(j.message || "Request lỗi");
+  return j;
+}
+async function post(url, body){
+  const r = await fetch(url, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(()=>({ok:false,message:"Lỗi JSON"}));
+  if(!r.ok) throw new Error(j.message || "Request lỗi");
+  return j;
+}
 
-  function requireLogin(){
-    if(!token){
-      location.href = "index.html";
-      return false;
-    }
-    return true;
-  }
+async function loadMe(){
+  const me = await get("/api/me");
+  $("hello").textContent = "Xin chào: " + me.user.username;
+  $("bal").textContent = money(me.user.balance);
+}
 
-  async function api(path, opts={}){
-    const headers = Object.assign(
-      { "Content-Type":"application/json" },
-      opts.headers || {},
-      token ? { "Authorization": "Bearer " + token } : {}
-    );
-    const res = await fetch(API + path, Object.assign({}, opts, { headers }));
-    const data = await res.json().catch(()=>({ok:false,message:"Lỗi JSON"}));
-    if(!res.ok) throw new Error(data.message || "Request lỗi");
-    return data;
-  }
+function renderServices(groups){
+  const wrap = $("services");
+  wrap.innerHTML = "";
+  groups.forEach(g=>{
+    const box = document.createElement("div");
+    box.className = "card";
+    box.innerHTML = `<h3>${g.group}</h3><hr><div class="list"></div>`;
+    const list = box.querySelector(".list");
 
-  async function loadMe(){
-    const me = await api("/api/me");
-    document.getElementById("hello").textContent = "Xin chào: " + me.user.username;
-    document.getElementById("balance").textContent = money(me.user.balance);
-  }
-
-  function renderServices(services){
-    const wrap = document.getElementById("services");
-    wrap.innerHTML = "";
-
-    services.forEach(group=>{
-      const box = document.createElement("div");
-      box.className = "card";
-      box.style.background = "rgba(255,255,255,.02)";
-      box.innerHTML = `
-        <h3>${group.group}</h3>
-        <div class="divider"></div>
-        <div class="list"></div>
+    g.items.forEach(it=>{
+      const item = document.createElement("div");
+      item.className = "card";
+      item.innerHTML = `
+        <div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div style="flex:1">
+            <div style="font-weight:800">${it.name}</div>
+            <div class="muted">${money(it.price)}đ</div>
+            <textarea class="input note" placeholder="Ghi chú đơn (acc/mk/yêu cầu...)"></textarea>
+          </div>
+          <div>
+            <button class="btn primary buy">Tạo đơn</button>
+          </div>
+        </div>
       `;
-      const list = box.querySelector(".list");
-
-      group.items.forEach(item=>{
-        const row = document.createElement("div");
-        row.className = "serviceItem";
-        row.innerHTML = `
-          <div class="serviceLeft">
-            <div style="font-weight:700">${item.name}</div>
-            <div class="muted" style="margin-top:6px">Ghi chú đơn (acc/mk/yêu cầu/thời gian rảnh...)</div>
-            <textarea class="input note" placeholder="VD: acc/mk, yêu cầu, thời gian rảnh..."></textarea>
-          </div>
-          <div style="text-align:right; min-width:120px">
-            <div class="price">${money(item.price)}đ</div>
-            <button class="btn create" style="margin-top:12px">Tạo đơn</button>
-          </div>
-        `;
-
-        const btn = row.querySelector(".create");
-        const noteEl = row.querySelector(".note");
-
-        btn.onclick = async ()=>{
-          try{
-            btn.disabled = true;
-            btn.textContent = "Đang tạo...";
-            const r = await api("/api/orders", {
-              method:"POST",
-              body: JSON.stringify({ serviceKey: item.key, note: noteEl.value })
-            });
-            alert("Tạo đơn thành công: " + r.order.id);
-            await loadMe();
-            await loadHistory();
-          }catch(e){
-            alert(e.message);
-          }finally{
-            btn.disabled = false;
-            btn.textContent = "Tạo đơn";
-          }
-        };
-
-        list.appendChild(row);
-        const div = document.createElement("div");
-        div.className = "divider";
-        list.appendChild(div);
-      });
-
-      wrap.appendChild(box);
+      item.querySelector(".buy").onclick = async ()=>{
+        const note = item.querySelector(".note").value;
+        try{
+          await post("/api/orders", { serviceKey: it.key, note });
+          alert("Tạo đơn thành công!");
+          await loadMe();
+          await loadHistory();
+        }catch(e){ alert(e.message); }
+      };
+      list.appendChild(item);
     });
-  }
 
-  async function loadServices(){
-    const r = await fetch("/api/services");
-    const data = await r.json();
-    if(!data.ok) throw new Error("Không tải được dịch vụ");
-    renderServices(data.services);
-  }
+    wrap.appendChild(box);
+  });
+}
 
-  async function loadHistory(){
-    document.getElementById("loading").textContent = "Đang tải...";
-    const h = await api("/api/history");
-    const wrap = document.getElementById("history");
+async function loadServices(){
+  const s = await get("/api/services");
+  renderServices(s.services);
+}
 
-    const ordersHtml = (h.orders || []).map(o=>`
-      <div class="card" style="background:rgba(255,255,255,.02)">
-        <div class="row" style="justify-content:space-between">
-          <div><b>${o.serviceName}</b> <span class="muted">(${o.group})</span></div>
-          <div class="badge">${o.status}</div>
-        </div>
-        <div class="muted" style="margin-top:6px">Mã đơn: <b>${o.id}</b> • Giá: <b>${money(o.price)}đ</b></div>
-        <div class="muted" style="margin-top:6px">Ghi chú: ${o.note ? o.note.replaceAll("<","&lt;") : "(không có)"}</div>
+async function loadHistory(){
+  const h = await get("/api/history");
+  const wrap = $("history");
+
+  const orders = (h.orders||[]).map(o=>`
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <b>${o.serviceName}</b>
+        <span class="badge">${o.status}</span>
       </div>
-    `).join("");
+      <div class="muted">Mã: <b>${o.id}</b> • ${money(o.price)}đ</div>
+      <div class="muted">Ghi chú: ${o.note ? o.note.replaceAll("<","&lt;") : "(không có)"}</div>
+    </div>
+  `).join("");
 
-    const topupsHtml = (h.topups || []).map(t=>`
-      <div class="card" style="background:rgba(255,255,255,.02)">
-        <div class="row" style="justify-content:space-between">
-          <div><b>${t.method}</b></div>
-          <div class="badge">${t.status}</div>
-        </div>
-        <div class="muted" style="margin-top:6px">
-          Mã: <b>${t.code}</b> • Gửi: <b>${money(t.amount)}đ</b> • Nhận: <b>${money(t.total)}đ</b>
-        </div>
-        ${t.method === "MB Bank" ? `<div style="margin-top:10px"><a class="btn" href="payment.html?id=${encodeURIComponent(t.id)}">Mở cổng thanh toán</a></div>` : ""}
+  const topups = (h.topups||[]).map(t=>`
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <b>${t.method}</b>
+        <span class="badge">${t.status}</span>
       </div>
-    `).join("");
+      <div class="muted">Mã: <b>${t.code}</b> • Gửi: ${money(t.amount)}đ • Nhận: ${money(t.total)}đ</div>
+      ${t.method==="MB Bank" ? `<div style="margin-top:10px"><a class="btn primary" href="/payment?id=${encodeURIComponent(t.id)}">Mở cổng thanh toán</a></div>` : ""}
+    </div>
+  `).join("");
 
-    wrap.innerHTML = `
-      <h3>Đơn hàng</h3>
-      ${ordersHtml || `<div class="muted">Chưa có đơn.</div>`}
-      <div class="divider"></div>
-      <h3>Nạp tiền</h3>
-      ${topupsHtml || `<div class="muted">Chưa có nạp.</div>`}
-    `;
-    document.getElementById("loading").textContent = "";
+  wrap.innerHTML = `
+    <h3>Đơn hàng</h3>
+    ${orders || `<div class="muted">Chưa có đơn.</div>`}
+    <hr>
+    <h3>Nạp tiền</h3>
+    ${topups || `<div class="muted">Chưa có nạp.</div>`}
+  `;
+}
+
+$("logout").onclick = async ()=>{
+  await post("/api/logout", {});
+  location.href = "/";
+};
+
+$("mbCreate").onclick = async ()=>{
+  $("mbMsg").textContent = "";
+  try{
+    const amt = Number($("mbAmount").value);
+    const r = await post("/api/topup/mb", { amount: amt });
+    $("mbMsg").innerHTML = `Tạo mã nạp: <b>${r.topup.code}</b> • <a href="/payment?id=${encodeURIComponent(r.topup.id)}">Mở cổng thanh toán</a>`;
+    await loadHistory();
+  }catch(e){ $("mbMsg").textContent = e.message; }
+};
+
+$("cardSend").onclick = async ()=>{
+  $("cardMsg").textContent = "";
+  try{
+    const telco = $("telco").value;
+    const value = Number($("value").value);
+    const serial = $("serial").value.trim();
+    const pin = $("pin").value.trim();
+    const r = await post("/api/topup/card", { telco, value, serial, pin });
+    $("cardMsg").innerHTML = `Đã gửi • Mã: <b>${r.topup.code}</b> • Nhận dự kiến: <b>${money(r.topup.total)}đ</b>`;
+    $("serial").value = ""; $("pin").value = "";
+    await loadHistory();
+  }catch(e){ $("cardMsg").textContent = e.message; }
+};
+
+$("reload").onclick = loadHistory;
+
+(async ()=>{
+  try{
+    await loadMe();
+    await loadServices();
+    await loadHistory();
+  }catch(e){
+    location.href = "/";
   }
-
-  // MB topup -> create -> go payment
-  document.getElementById("btnMb").onclick = async ()=>{
-    try{
-      const amt = Number(document.getElementById("mbAmount").value);
-      const r = await api("/api/topup/mb", { method:"POST", body: JSON.stringify({ amount: amt }) });
-      document.getElementById("mbResult").innerHTML =
-        `Tạo thành công. Mã nạp: <b>${r.topup.code}</b> • <a href="payment.html?id=${encodeURIComponent(r.topup.id)}">Mở cổng thanh toán</a>`;
-      await loadHistory();
-    }catch(e){
-      alert(e.message);
-    }
-  };
-
-  // Card topup
-  document.getElementById("btnCard").onclick = async ()=>{
-    try{
-      const telco = document.getElementById("telco").value;
-      const value = Number(document.getElementById("cardValue").value);
-      const serial = document.getElementById("serial").value.trim();
-      const pin = document.getElementById("pin").value.trim();
-      const r = await api("/api/topup/card", {
-        method:"POST",
-        body: JSON.stringify({ telco, value, serial, pin })
-      });
-      document.getElementById("cardResult").innerHTML =
-        `Đã gửi thẻ. Mã: <b>${r.topup.code}</b> • Nhận dự kiến: <b>${money(r.topup.total)}đ</b> (phí ${money(r.topup.fee)}đ)`;
-      document.getElementById("serial").value = "";
-      document.getElementById("pin").value = "";
-      await loadHistory();
-    }catch(e){
-      alert(e.message);
-    }
-  };
-
-  document.getElementById("btnReload").onclick = loadHistory;
-  document.getElementById("btnLogout").onclick = ()=>{
-    localStorage.removeItem("token");
-    location.href = "index.html";
-  };
-
-  (async ()=>{
-    if(!requireLogin()) return;
-    try{
-      await loadMe();
-      await loadServices();
-      await loadHistory();
-    }catch(e){
-      alert(e.message);
-      // token sai -> về login
-      localStorage.removeItem("token");
-      location.href = "index.html";
-    }
-  })();
+})();
 </script>
 </body>
-                  </html>
+</html>
