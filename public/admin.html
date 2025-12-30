@@ -1,50 +1,48 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin Login - Shop Gà Con</title>
-  <link rel="stylesheet" href="app.css" />
+  <title>Admin Login</title>
+  <link rel="stylesheet" href="/public/app.css" />
 </head>
-<body class="center">
-  <div class="card card-lg">
-    <div class="brand">
-      <div class="logo">AD</div>
-      <div>
-        <h2>Admin</h2>
-        <div class="muted">Đăng nhập để quản lý</div>
+<body>
+  <div class="topbar">
+    <div class="brand">Admin</div>
+    <a class="btn" href="/">Về trang user</a>
+  </div>
+
+  <div class="container" style="max-width:560px">
+    <div class="card">
+      <h2>Đăng nhập admin</h2>
+      <div class="row">
+        <input class="input" id="u" placeholder="Username">
+        <input class="input" id="p" type="password" placeholder="Password">
       </div>
+      <button class="btn primary" id="login">Đăng nhập</button>
+      <div class="muted" id="msg" style="margin-top:10px"></div>
     </div>
-
-    <label>Tài khoản admin</label>
-    <input id="a_user" placeholder="ADMIN_USER" />
-
-    <label>Mật khẩu admin</label>
-    <input id="a_pass" type="password" placeholder="ADMIN_PASS" />
-
-    <button class="btn" onclick="adminLogin()">Đăng nhập</button>
-    <div id="msg" class="msg"></div>
-
-    <div class="hint">Quay lại <a href="index.html">User login</a></div>
   </div>
 
 <script>
-async function adminLogin(){
+async function post(url, body){
+  const r = await fetch(url, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(()=>({ok:false,message:"Lỗi JSON"}));
+  if(!r.ok) throw new Error(j.message || "Request lỗi");
+  return j;
+}
+
+login.onclick = async ()=>{
   msg.textContent = "";
   try{
-    const r = await fetch("/api/admin/login",{
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ user: a_user.value, pass: a_pass.value })
-    });
-    const d = await r.json();
-    if(!r.ok) throw new Error(d.msg || "Sai admin");
-    localStorage.setItem("adminToken", d.token);
-    location.href = "admin-dashboard.html";
-  }catch(e){
-    msg.textContent = e.message;
-  }
-}
+    await post("/api/admin/login", { username: u.value.trim(), password: p.value.trim() });
+    location.href = "/admin/dashboard";
+  }catch(e){ msg.textContent = e.message; }
+};
 </script>
 </body>
 </html>
