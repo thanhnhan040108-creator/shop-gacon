@@ -1,453 +1,367 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Shop Gà Con - Home</title>
-  <link rel="stylesheet" href="app.css" />
+  <title>Shop Gà Con — Home</title>
+  <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
-  <div class="topbar">
-    <div>
-      <div class="title">Shop Gà Con</div>
-      <div class="muted" id="hello"></div>
-    </div>
-    <div class="top-actions">
-      <a class="btn ghost" href="admin.html">Admin</a>
-      <button class="btn" onclick="logout()">Đăng xuất</button>
-    </div>
-  </div>
-
   <div class="container">
-    <div class="grid">
+    <div class="topbar">
+      <div class="brand">
+        <h1>Shop Gà Con</h1>
+        <div class="sub" id="hello">Xin chào</div>
+      </div>
+      <div class="row">
+        <span class="badge"><span class="dot"></span> <span id="balanceText">Số dư: 0đ</span></span>
+        <button class="btn danger" onclick="logout()">Đăng xuất</button>
+      </div>
+    </div>
 
-      <!-- SERVICES -->
+    <div class="grid two">
       <div class="card">
-        <h3>Dịch vụ Cày VOCALA</h3>
-        <div class="muted">
-          Chọn dịch vụ → ghi chú (acc/mk, yêu cầu, thời gian rảnh...) → tạo đơn.
-          <br>
-          Có 2 cách: <b>Tạo đơn (chuyển khoản)</b> hoặc <b>Mua bằng số dư</b>.
+        <div class="head"><h2>Dịch vụ VOCALA</h2></div>
+        <div class="body">
+          <div class="muted">Chọn dịch vụ → ghi chú (acc/yêu cầu) → tạo đơn. Sau đó bạn có thể <b>thanh toán bằng số dư</b> hoặc vào trang thanh toán chuyển khoản.</div>
+          <div id="services"></div>
         </div>
-        <div id="services"></div>
       </div>
 
-      <!-- TOPUP -->
-      <div class="card">
-        <h3>Nạp tiền</h3>
-        <div class="muted">Nạp MB hoặc nạp thẻ cào (admin duyệt → số dư tăng)</div>
+      <div>
+        <div class="card">
+          <div class="head"><h2>Nạp tiền</h2></div>
+          <div class="body">
+            <div class="sectionTitle">A) Chuyển khoản (MB Bank)</div>
+            <div class="label">Số tiền (VND)</div>
+            <input id="bankAmount" class="input" type="number" placeholder="vd: 50000" />
+            <div class="label">Phương thức</div>
+            <select id="bankMethod" class="input">
+              <option>MB Bank</option>
+            </select>
+            <div class="hr"></div>
+            <button class="btn primary" onclick="createBankTopup()">Tạo mã nạp (Bank)</button>
+            <div id="bankResult" class="muted" style="margin-top:10px"></div>
 
-        <div class="subcard">
-          <h4>Nạp MB Bank</h4>
+            <div class="hr"></div>
 
-          <label>Phương thức</label>
-          <select id="method">
-            <option>MB Bank</option>
-          </select>
+            <div class="sectionTitle">B) Nạp thẻ cào (tạo yêu cầu)</div>
+            <div class="muted">
+              Nhà mạng: Viettel / Mobifone / Vinaphone / Garena / Zing<br/>
+              Mệnh giá: 20k / 50k / 100k / 200k / 500k<br/>
+              Phí: <b>dưới 50k = 20%</b>, còn lại <b>15%</b> (cộng tiền sau khi admin duyệt)
+            </div>
 
-          <label>Số tiền (VND)</label>
-          <input id="amount" inputmode="numeric" placeholder="vd: 50000" />
+            <div class="label">Nhà mạng</div>
+            <select id="cardTelco" class="input">
+              <option>Viettel</option>
+              <option>Mobifone</option>
+              <option>Vinaphone</option>
+              <option>Garena</option>
+              <option>Zing</option>
+            </select>
 
-          <button class="btn" onclick="createTopup()">Tạo mã nạp</button>
-          <div class="hint">Tạo mã xong sẽ chuyển sang trang thanh toán.</div>
-        </div>
+            <div class="label">Mệnh giá</div>
+            <select id="cardAmount" class="input">
+              <option value="20000">20.000</option>
+              <option value="50000">50.000</option>
+              <option value="100000">100.000</option>
+              <option value="200000">200.000</option>
+              <option value="500000">500.000</option>
+            </select>
 
-        <div class="subcard">
-          <h4>Nạp thẻ cào</h4>
-          <div class="muted">
-            Phí: <b>15%</b> cho dưới 100k • <b>20%</b> cho từ 100k trở lên
+            <div class="label">Serial</div>
+            <input id="cardSerial" class="input" placeholder="Nhập serial" />
+
+            <div class="label">Mã thẻ (PIN)</div>
+            <input id="cardPin" class="input" placeholder="Nhập mã thẻ" />
+
+            <div class="hr"></div>
+            <button class="btn primary" onclick="createCardTopup()">Gửi nạp thẻ</button>
+            <div id="cardResult" class="muted" style="margin-top:10px"></div>
           </div>
-
-          <label>Loại thẻ</label>
-          <select id="cardProvider">
-            <option>Viettel</option>
-            <option>Vinaphone</option>
-            <option>Mobifone</option>
-            <option>Garena</option>
-            <option>Zing</option>
-          </select>
-
-          <label>Mệnh giá (VND)</label>
-          <select id="cardAmount">
-            <option value="20000">20.000</option>
-            <option value="50000">50.000</option>
-            <option value="100000">100.000</option>
-            <option value="200000">200.000</option>
-            <option value="500000">500.000</option>
-          </select>
-
-          <label>Serial</label>
-          <input id="cardSerial" placeholder="Nhập số serial" />
-
-          <label>Mã thẻ</label>
-          <input id="cardPin" placeholder="Nhập mã thẻ" />
-
-          <button class="btn" onclick="createCardTopup()">Gửi thẻ</button>
-          <div class="msg" id="cardMsg"></div>
         </div>
-      </div>
 
-      <!-- HISTORY -->
-      <div class="card">
-        <div class="row-between">
-          <div>
-            <h3>Lịch sử</h3>
-            <div class="muted">Đơn hàng + nạp tiền</div>
+        <div class="card">
+          <div class="head">
+            <h2>Lịch sử</h2>
+            <button class="btn small" onclick="loadHistory()">Tải lại</button>
           </div>
-          <button class="btn ghost" onclick="reloadAll()">Tải lại</button>
-        </div>
-
-        <div class="subcard">
-          <h4>Đơn hàng</h4>
-          <div id="orders" class="list"></div>
-        </div>
-
-        <div class="subcard">
-          <h4>Nạp MB</h4>
-          <div id="topups" class="list"></div>
-        </div>
-
-        <div class="subcard">
-          <h4>Nạp thẻ cào</h4>
-          <div id="cardTopups" class="list"></div>
+          <div class="body">
+            <div id="history" class="muted">Đang tải...</div>
+          </div>
         </div>
       </div>
-
     </div>
   </div>
 
-  <!-- Floating message button -->
-  <a class="float-msg"
-     href="https://www.facebook.com/share/1ajgzqUGdh/"
-     target="_blank"
-     rel="noopener"
-     title="Nhắn tin hỗ trợ">
-    💬
+  <!-- Nút message -> FB link bạn đưa -->
+  <a class="fab" href="https://www.facebook.com/share/1ajgzqUGdh/" target="_blank" aria-label="Message">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3C7.03 3 3 6.61 3 11.06c0 2.54 1.3 4.8 3.33 6.29V21l3.54-1.95c.69.19 1.42.3 2.13.3 4.97 0 9-3.61 9-8.06S16.97 3 12 3Z" stroke="white" stroke-width="1.8" opacity=".95"/>
+      <path d="M7.4 13.2 10.6 9.8 13 12.2 16.6 9.2" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
   </a>
 
+  <div class="toast" id="toast"><b id="tTitle">Thông báo</b><div id="tMsg" class="muted"></div></div>
+
 <script>
-  // ===== AUTH CHECK =====
-  const u = JSON.parse(localStorage.getItem("user") || "null");
-  if (!u) location.href = "index.html";
+  const toast = (title, msg) => {
+    document.getElementById('tTitle').textContent = title;
+    document.getElementById('tMsg').textContent = msg || '';
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2600);
+  };
 
-  function logout() {
-    localStorage.clear();
-    location.href = "index.html";
+  function fmtVND(n){
+    try { return new Intl.NumberFormat('vi-VN').format(n) + 'đ'; } catch(e){ return n + 'đ'; }
   }
 
-  // ===== UTILS =====
-  function formatVND(n) {
-    n = Number(n || 0);
-    return n.toLocaleString("vi-VN") + "đ";
+  function getToken(){
+    return localStorage.getItem('userToken') || '';
   }
-  function esc(s){ return String(s).replace(/'/g,"\\'"); }
 
-  // ===== SERVICES (VOCALA) =====
-  const SERVICES = [
-    {
-      title: "Combo Draco / Draco",
-      items: [
-        { name: "Combo Draco", price: 100000 },
-        { name: "Đai", price: 10000 },
-        { name: "Súng", price: 12000 },
-        { name: "Kiếm", price: 10000 },
-        { name: "Trứng rồng", price: 5000 },
-        { name: "Độc rừng", price: 5000 }
-      ]
-    },
-    {
-      title: "ITEM",
-      items: [
-        { name: "Yama", price: 5000 },
-        { name: "Tushita", price: 5000 },
-        { name: "Ghép", price: 5000 },
-        { name: "A-Z CDK  (bao all)", price: 15000 },
-        { name: "A-Z TT  (bao all)", price: 20000 },
-        { name: "Shark Anchor", price: 10000 },
-        { name: "Soul Guitar", price: 10000 },
-        { name: "Yoru V3  (Yêu cầu full 4 tộc v3)", price: 20000 },
-        { name: "Foxlamp", price: 15000 }
-      ]
-    },
-    {
-      title: "LEVI",
-      items: [
-        { name: "Kéo tim về Hydra", price: 20000 },
-        { name: "Kéo tim về Tiki", price: 20000 },
-        { name: "Mele máu", price: 30000 }
-      ]
-    },
-    {
-      title: "Ken & Mas",
-      items: [
-        { name: "Haki quan sát V2", price: 20000 },
-        { name: "1 - 600 mas", price: 5000 }
-      ]
-    },
-    {
-      title: "RAID / MELEE",
-      items: [
-        { name: "1 - 700", price: 3000 },
-        { name: "700 - 1500", price: 8000 },
-        { name: "1500 - max", price: 15000 },
-        { name: "1 - max", price: 20000 },
-        { name: "Gear", price: 5000 },
-        { name: "FG", price: 20000 },
-        { name: "V1 - V3", price: 5000 }
-      ]
-    },
-    {
-      title: "BELI / FRAG",
-      items: [
-        { name: "2m beli", price: 1000 },
-        { name: "2k frag", price: 1000 }
-      ]
+  function requireLogin(){
+    const t = getToken();
+    if(!t){
+      location.href = '/index.html';
+      return false;
     }
-  ];
+    return true;
+  }
 
-  function renderServices() {
-    services.innerHTML = SERVICES.map((cat, ci) => {
-      const itemsHtml = cat.items.map((it, i) => {
-        const id = `note_${ci}_${i}`;
-        return `
-          <div class="service-item">
-            <div class="service-left">
-              <div class="service-name">${it.name}</div>
-              <div class="service-price">${formatVND(it.price)}</div>
-            </div>
-            <div class="service-right">
-              <input id="${id}" class="note"
-                placeholder="Ghi chú: acc/mk, yêu cầu, thời gian rảnh..." />
-              <button class="btn"
-                onclick="createOrder('${esc(it.name)}', ${it.price}, document.getElementById('${id}').value)">
-                Tạo đơn (chuyển khoản)
-              </button>
-              <button class="btn ghost"
-                onclick="createOrderAndPayBalance('${esc(it.name)}', ${it.price}, document.getElementById('${id}').value)">
-                Mua bằng số dư
-              </button>
+  function logout(){
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userInfo');
+    location.href = '/index.html';
+  }
+
+  async function api(url, opts={}){
+    opts.headers = Object.assign({}, opts.headers || {}, {
+      'Content-Type':'application/json',
+      'x-auth-token': getToken()
+    });
+    const r = await fetch(url, opts);
+    const j = await r.json().catch(()=>({ok:false, message:'Lỗi đọc JSON'}));
+    if(!r.ok && j && j.message) throw new Error(j.message);
+    return j;
+  }
+
+  async function loadServices(){
+    const r = await fetch('/api/services');
+    const j = await r.json();
+    const wrap = document.getElementById('services');
+    wrap.innerHTML = '';
+    if(!j.ok) return wrap.innerHTML = '<div class="muted">Không tải được dịch vụ</div>';
+
+    j.services.forEach(group=>{
+      const box = document.createElement('div');
+      box.className = 'serviceGroup';
+      box.innerHTML = `<h3>${group.group}</h3>`;
+      group.items.forEach(item=>{
+        const row = document.createElement('div');
+        row.className = 'serviceItem';
+        row.innerHTML = `
+          <div class="serviceInfo">
+            <div class="name">${item.name}</div>
+            <div class="note">${item.note ? item.note : ''}</div>
+            <div class="label" style="margin-top:8px">Ghi chú đơn (acc/yêu cầu)</div>
+            <textarea class="input" data-note="${item.key}" placeholder="VD: acc/mk, yêu cầu, thời gian rảnh..."></textarea>
+            <div class="row" style="margin-top:10px">
+              <button class="btn primary" onclick="createOrder('${item.key}')">Tạo đơn</button>
+              <button class="btn" onclick="goPaymentForService('${item.key}')">Thanh toán (Bank)</button>
             </div>
           </div>
+          <div class="price">${fmtVND(item.price)}</div>
         `;
-      }).join("");
-
-      return `
-        <div class="category">
-          <div class="category-title">${cat.title}</div>
-          ${itemsHtml}
-        </div>
-      `;
-    }).join("");
-  }
-
-  // ===== ME =====
-  async function refreshMe() {
-    const r = await fetch("/api/me/" + encodeURIComponent(u.username));
-    const d = await r.json();
-    if (r.ok) {
-      localStorage.setItem("user", JSON.stringify(d.user));
-      hello.innerHTML = `Xin chào <b>${d.user.username}</b> • Số dư: <b>${formatVND(d.user.balance)}</b>`;
-    } else {
-      hello.textContent = "Không lấy được thông tin user";
-    }
-  }
-
-  // ===== ORDERS =====
-  async function createOrder(service, price, note) {
-    const r = await fetch("/api/order", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({
-        username: u.username,
-        service,
-        price,
-        note: (note||"").trim()
-      })
+        box.appendChild(row);
+      });
+      wrap.appendChild(box);
     });
-    const d = await r.json();
-    if(!r.ok) return alert(d.msg || "Lỗi tạo đơn");
-
-    // chuyển qua payment.html (nếu bạn có file này)
-    localStorage.setItem("pay_order", JSON.stringify(d));
-    location.href = "payment.html?type=order";
   }
 
-  async function payOrderByBalance(orderId){
-    const r = await fetch("/api/order/pay-balance",{
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ username: u.username, orderId })
-    });
-    const d = await r.json();
-    if(!r.ok) throw new Error(d.msg || "Thanh toán thất bại");
-    return d;
-  }
-
-  async function createOrderAndPayBalance(service, price, note){
-    // tạo đơn trước
-    const r = await fetch("/api/order", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({
-        username: u.username,
-        service,
-        price,
-        note: (note||"").trim()
-      })
-    });
-    const d = await r.json();
-    if(!r.ok) return alert(d.msg || "Lỗi tạo đơn");
-
-    // thanh toán bằng số dư
+  async function createOrder(serviceKey){
+    if(!requireLogin()) return;
+    const ta = document.querySelector(`textarea[data-note="${serviceKey}"]`);
+    const note = ta ? ta.value.trim() : '';
     try{
-      await payOrderByBalance(d.id);
-      alert("Mua bằng số dư thành công!");
-      await reloadAll();
+      const j = await api('/api/orders/create', {
+        method:'POST',
+        body: JSON.stringify({ serviceKey, note })
+      });
+      toast('OK', 'Tạo đơn thành công');
+      await loadHistory();
     }catch(e){
-      alert(e.message);
-      // nếu số dư không đủ: đơn vẫn nằm trong lịch sử, user có thể thanh toán sau
-      await reloadAll();
+      toast('Lỗi', e.message);
     }
   }
 
-  async function loadOrders() {
-    const r = await fetch("/api/orders/" + encodeURIComponent(u.username));
-    const d = await r.json();
-    if(!r.ok) { orders.innerHTML = `<div class="muted">Không tải được đơn</div>`; return; }
-    if(!d.length) { orders.innerHTML = `<div class="muted">Chưa có đơn</div>`; return; }
-
-    orders.innerHTML = d.map(o => `
-      <div class="row">
-        <div class="row-main">
-          <div class="row-title">${o.service}</div>
-          <div class="row-sub">
-            ${formatVND(o.price)} • ${o.time}<br>
-            <b>Thanh toán:</b> ${o.paidStatus || "Chưa thanh toán"} • <b>Mã:</b> ${o.payCode || ""}<br>
-            <b>Trạng thái:</b> ${o.status}${o.adminNote ? ` • <b>Admin:</b> ${o.adminNote}` : ""}<br>
-            <b>Ghi chú:</b> ${o.note || "(trống)"}<br>
-            ${o.payMethod ? `<b>Hình thức:</b> ${o.payMethod}<br>` : ``}
-          </div>
-
-          ${(o.paidStatus || "Chưa thanh toán") !== "Đã thanh toán"
-            ? `<div style="margin-top:10px" class="inline">
-                 <button class="btn" onclick="payFromHistory(${o.id})">Thanh toán bằng số dư</button>
-               </div>`
-            : ""
-          }
-        </div>
-      </div>
-    `).join("");
-  }
-
-  async function payFromHistory(orderId){
+  // Nếu bạn bấm "Thanh toán (Bank)" trước khi tạo đơn: tạo luôn đơn rồi chuyển payment
+  async function goPaymentForService(serviceKey){
+    if(!requireLogin()) return;
+    const ta = document.querySelector(`textarea[data-note="${serviceKey}"]`);
+    const note = ta ? ta.value.trim() : '';
     try{
-      await payOrderByBalance(orderId);
-      alert("Thanh toán bằng số dư thành công!");
-      await reloadAll();
+      const j = await api('/api/orders/create', {
+        method:'POST',
+        body: JSON.stringify({ serviceKey, note })
+      });
+      location.href = `/payment.html?orderId=${encodeURIComponent(j.order.id)}`;
     }catch(e){
-      alert(e.message);
+      toast('Lỗi', e.message);
     }
   }
 
-  // ===== TOPUP MB =====
-  async function createTopup() {
-    const amt = Number(amount.value || 0);
-    if (amt <= 0) return alert("Nhập số tiền hợp lệ");
+  async function createBankTopup(){
+    if(!requireLogin()) return;
+    const amount = Number(document.getElementById('bankAmount').value);
+    const method = document.getElementById('bankMethod').value;
+    const out = document.getElementById('bankResult');
+    out.textContent = '';
+    if(!amount || amount <= 0) return toast('Lỗi', 'Nhập số tiền hợp lệ');
 
-    const r = await fetch("/api/topup", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ username: u.username, amount: amt, method: method.value })
-    });
-    const d = await r.json();
-    if(!r.ok) return alert(d.msg || "Lỗi tạo mã nạp");
-
-    localStorage.setItem("pay_topup", JSON.stringify(d.topup));
-    location.href = "payment.html?type=topup";
-  }
-
-  async function loadTopups() {
-    const r = await fetch("/api/topups/" + encodeURIComponent(u.username));
-    const d = await r.json();
-    if(!r.ok) { topups.innerHTML = `<div class="muted">Không tải được nạp</div>`; return; }
-    if(!d.length) { topups.innerHTML = `<div class="muted">Chưa có lịch sử nạp</div>`; return; }
-
-    topups.innerHTML = d.map(t => `
-      <div class="row">
-        <div class="row-main">
-          <div class="row-title">${t.method} • ${formatVND(t.amount)}</div>
-          <div class="row-sub">
-            <b>Mã:</b> ${t.code} • ${t.time}<br>
-            <b>Trạng thái:</b> ${t.status}
-          </div>
-        </div>
-      </div>
-    `).join("");
-  }
-
-  // ===== CARD TOPUP =====
-  async function createCardTopup(){
-    cardMsg.textContent = "";
     try{
-      const body = {
-        username: u.username,
-        provider: cardProvider.value,
-        amount: Number(cardAmount.value),
-        serial: cardSerial.value,
-        pin: cardPin.value
-      };
-
-      const r = await fetch("/api/cardtopup",{
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify(body)
+      const j = await api('/api/topup/bank/create', {
+        method:'POST',
+        body: JSON.stringify({ method, amount })
       });
 
-      const d = await r.json();
-      if(!r.ok) throw new Error(d.msg || "Lỗi nạp thẻ");
-
-      cardMsg.textContent = `Đã gửi thẻ. Mã: ${d.card.code} • Nhận: ${formatVND(d.card.netAmount)}`;
-      cardSerial.value = "";
-      cardPin.value = "";
-
-      await loadCardTopups();
-      await refreshMe();
+      out.innerHTML = `
+        <div class="kv"><b>Tạo mã nạp thành công</b><span class="tag warn">Chờ admin duyệt</span></div>
+        <div class="hr"></div>
+        <div class="muted">
+          Nội dung chuyển khoản / thanh toán: <b>${j.topup.code}</b><br/>
+          Số tiền: <b>${fmtVND(j.topup.amount)}</b><br/>
+          <button class="btn small" onclick="location.href='/payment.html?topupId=${j.topup.id}'">Mở trang thanh toán</button>
+        </div>
+      `;
+      await loadHistory();
     }catch(e){
-      cardMsg.textContent = e.message;
+      toast('Lỗi', e.message);
     }
   }
 
-  async function loadCardTopups(){
-    const r = await fetch("/api/cardtopups/" + encodeURIComponent(u.username));
-    const d = await r.json();
-    if(!r.ok) { cardTopups.innerHTML = `<div class="muted">Không tải được lịch sử thẻ</div>`; return; }
-    if(!d.length) { cardTopups.innerHTML = `<div class="muted">Chưa có nạp thẻ</div>`; return; }
+  async function createCardTopup(){
+    if(!requireLogin()) return;
+    const telco = document.getElementById('cardTelco').value;
+    const amount = Number(document.getElementById('cardAmount').value);
+    const serial = document.getElementById('cardSerial').value.trim();
+    const pin = document.getElementById('cardPin').value.trim();
+    const out = document.getElementById('cardResult');
+    out.textContent = '';
 
-    cardTopups.innerHTML = d.map(c => `
-      <div class="row">
-        <div class="row-main">
-          <div class="row-title">${c.provider} • ${formatVND(c.amount)}</div>
-          <div class="row-sub">
-            <b>Mã:</b> ${c.code} • ${c.time}<br>
-            <b>Phí:</b> ${c.feePercent}% → <b>Nhận:</b> ${formatVND(c.netAmount)}<br>
-            <b>Trạng thái:</b> ${c.status}${c.adminNote ? ` • <b>Admin:</b> ${c.adminNote}` : ""}
-          </div>
-        </div>
-      </div>
-    `).join("");
+    try{
+      const j = await api('/api/topup/card/create', {
+        method:'POST',
+        body: JSON.stringify({ telco, amount, serial, pin })
+      });
+      out.innerHTML = `
+        <div class="kv"><b>Đã gửi nạp thẻ</b><span class="tag warn">Chờ admin duyệt</span></div>
+        <div class="muted" style="margin-top:8px">${j.topup.note}</div>
+      `;
+      document.getElementById('cardSerial').value = '';
+      document.getElementById('cardPin').value = '';
+      await loadHistory();
+      toast('OK', 'Gửi nạp thẻ thành công');
+    }catch(e){
+      toast('Lỗi', e.message);
+    }
   }
 
-  // ===== RELOAD ALL =====
-  async function reloadAll() {
-    await refreshMe();
-    await loadOrders();
-    await loadTopups();
-    await loadCardTopups();
+  async function payOrder(orderId){
+    if(!requireLogin()) return;
+    try{
+      const j = await api('/api/orders/pay', {
+        method:'POST',
+        body: JSON.stringify({ orderId })
+      });
+      toast('OK', j.message || 'Thanh toán OK');
+      document.getElementById('balanceText').textContent = 'Số dư: ' + fmtVND(j.balance);
+      await loadHistory();
+    }catch(e){
+      toast('Lỗi', e.message);
+    }
   }
 
-  // init
-  renderServices();
-  reloadAll();
+  function tagForStatus(st){
+    if(st === 'DONE') return '<span class="tag ok">DONE</span>';
+    if(st === 'WORKING') return '<span class="tag warn">WORKING</span>';
+    if(st === 'CANCELLED') return '<span class="tag bad">CANCELLED</span>';
+    return '<span class="tag warn">PENDING</span>';
+  }
+
+  async function loadHistory(){
+    if(!requireLogin()) return;
+    const h = document.getElementById('history');
+    h.textContent = 'Đang tải...';
+    try{
+      const j = await api('/api/history', { method:'GET' });
+      document.getElementById('balanceText').textContent = 'Số dư: ' + fmtVND(j.user.balance);
+
+      const orders = j.orders || [];
+      const topups = j.topups || [];
+
+      let html = '';
+      html += `<div class="sectionTitle">Đơn hàng</div>`;
+      if(!orders.length) html += `<div class="muted">Chưa có đơn.</div>`;
+      else{
+        html += `<table class="table"><thead><tr>
+          <th>Thời gian</th><th>Dịch vụ</th><th>Giá</th><th>Trạng thái</th><th>Thanh toán</th>
+        </tr></thead><tbody>`;
+        orders.forEach(o=>{
+          html += `<tr>
+            <td>${new Date(o.createdAt).toLocaleString('vi-VN')}</td>
+            <td><b>${o.serviceName}</b><br/><span class="muted">${o.note || ''}</span><br/><span class="muted">${o.adminNote || ''}</span></td>
+            <td>${fmtVND(o.price)}</td>
+            <td>${tagForStatus(o.status)}</td>
+            <td>
+              ${o.paid ? '<span class="tag ok">Đã trả</span>' : `
+                <button class="btn small primary" onclick="payOrder('${o.id}')">Trả bằng số dư</button>
+                <button class="btn small" onclick="location.href='/payment.html?orderId=${o.id}'">Bank</button>
+              `}
+            </td>
+          </tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+
+      html += `<div class="hr"></div>`;
+      html += `<div class="sectionTitle">Nạp tiền</div>`;
+      if(!topups.length) html += `<div class="muted">Chưa có nạp.</div>`;
+      else{
+        html += `<table class="table"><thead><tr>
+          <th>Thời gian</th><th>Loại</th><th>Số tiền</th><th>Trạng thái</th><th>Ghi chú</th>
+        </tr></thead><tbody>`;
+        topups.forEach(t=>{
+          const type = (t.type === 'CARD') ? `CARD (${t.method})` : `BANK (${t.method})`;
+          const st = t.status === 'APPROVED' ? '<span class="tag ok">APPROVED</span>' :
+                     t.status === 'REJECTED' ? '<span class="tag bad">REJECTED</span>' :
+                     '<span class="tag warn">WAITING</span>';
+          html += `<tr>
+            <td>${new Date(t.createdAt).toLocaleString('vi-VN')}</td>
+            <td>${type}${t.code ? `<br/><span class="muted">${t.code}</span>` : ''}</td>
+            <td>${fmtVND(t.amount)}</td>
+            <td>${st}</td>
+            <td><span class="muted">${t.note || ''}</span></td>
+          </tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+
+      h.innerHTML = html;
+    }catch(e){
+      h.textContent = 'Lỗi tải lịch sử: ' + e.message;
+    }
+  }
+
+  (async function init(){
+    if(!requireLogin()) return;
+    const u = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    document.getElementById('hello').textContent = `Xin chào ${u.username || ''} • ${u.email || ''}`;
+    await loadServices();
+    await loadHistory();
+  })();
 </script>
 </body>
-      </html>
+                                                        </html>
